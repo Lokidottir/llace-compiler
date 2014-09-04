@@ -5,6 +5,7 @@
 #include <cstring>
 #include <vector>
 #include "generic-btree.hpp"
+#include "EBNFTree.hpp"
 
 std::string stripSubstr(const std::string& content, const std::string& toStrip) {
 	std::string altered_content(content);
@@ -22,6 +23,7 @@ int main(int argc, char** args) {
 			ebnf_filename = stripSubstr(stripSubstr(args[i + 1], "\""),"'");
 		}
 	}
+	EBNFTree::testProgram();
 	
 	return 0;
 }
