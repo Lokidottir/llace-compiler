@@ -5,6 +5,13 @@
 #include <map>
 #include <utility>
 #include <regex>
+#include <sstream>
+
+#ifndef PARSE_TYPE_DEFAULTS
+#define PARSE_TYPE_DEFAULTS
+typedef uintmax_t uint_type;
+typedef double prec_type;
+#endif
 
 const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 	std::pair<std::string, std::string>("(*","*)"), //Comment
@@ -26,13 +33,32 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_SPECIAL ebnf_cont_str[6]
 #define EBNF_S_ALL ebnf_cont_str
 
+#define REGEX_SPECIAL_CHARS "$^{[(|)]}*+?\\."
+
 #define EBNF_REGEX_COMMENT "(\\(\\*)(?<=\\(\\*)((|\\v|.)*)(?=\\*\\))(\\*\\))"
-#define EBNF_REGEX_IDDECLR "([[:alnum:]]|_)(([[:alnum:]]|_)*)(\\s*)(?=(=)((.|\\n)*)(;))"
+#define EBNF_REGEX_IDDECLR "(([[:alnum:]]|_)+)(\\s*)(?=(=)((.|\\n)*)(;))"
 #define EBNF_REGEX_TERMSTR "((\")([^\"]*)(\"))|((')([^']*)('))"
 
+template<class T1, class T2>
+bool oneOf(const T1& item, const T2& container, const uint_type size) {
+	for (uint_type i = 0; i < size; i++) {
+		if (container[i] == item) return true;
+	}
+	return false;
+}
+
+template<class T1, class T2>
+bool oneOf(const T1& item, const T2& container) {
+	return oneOf<T1,T2>(item,container,container.size());
+}
 
 struct EBNFTree {
 	public:
+		
+		static bool isRegexSyntaxChar(const char toCheck) {
+			return oneOf<char,std::string>(toCheck, REGEX_SPECIAL_CHARS);
+		}
+		
 		static void testProgram();
 		/*
 			EBNF contaiment strings
@@ -52,7 +78,42 @@ struct EBNFTree {
 				Being between the containers INCLUDES being part of the container
 				strings.
 			*/
-			
+			/*
+				
+			*/
+			std::string lhs, rhs;
+			for (uint_type i = 0; i < std::get<0>(between).size(); i++) {
+				if (isRegexSyntaxChar(std::get<0>(between)[i])) lhs += '\\';
+				lhs += std::get<0>(between)[i];
+			}
+			for (uint_type i = 0; i < std::get<1>(between).size(); i++) {
+				if (isRegexSyntaxChar(std::get<1>(between)[i])) rhs += '\\';
+				rhs += std::get<1>(between)[i];
+			}
+			std::stringstream regex_stream;
+			regex_stream << "(())" ;//"(?<=" << lhs << ")((.|\\n)*)(?=" << rhs << ")";
+			try {
+				std::regex reg(regex_stream.str(), std::regex_constants::extended);
+				std::smatch regm;
+				if (std::regex_match(content,regm,reg)) {
+					for (uint_type i = 0; i < regm.size(); i++) {
+						if (regm.position(i) <= index && index <= uint_type(regm.position(i) + regm.length(i))) {
+							return true;
+						}
+					}
+				}
+				else {
+					return false;
+				}
+			}
+			catch (std::regex_error& err) {
+				std::cout << "could not process regex:\n" << regex_stream.str() << "\nreason given: \n" << err.what() << std::endl;
+				for (uint_type i = 0; i < regex_stream.str().size(); i++) {
+					std::cout << "char @ " << i << " is " << regex_stream.str()[i] << " as " << uint_type(regex_stream.str()[i]) << std::endl;
+				}
+				exit(-1);
+			}
+			return false;
 		}
 		
 		static uint_type skipThrough(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
@@ -66,7 +127,7 @@ struct EBNFTree {
 			}
 			else {
 				return index;
-			} 
+			}
 		}
 		
 		bool loadIdentifiers(const std::string& content) {
@@ -111,7 +172,7 @@ struct EBNFTree {
 };
 
 void EBNFTree::testProgram() {
-	std::string str1 = "(*This is a comment*) abcd";
+	std::string str1 = "(* This is a comment *) \"A string! abcd.\"";
 	std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
 	std::cout << str1 << std::endl;
 	for (uint_type i = 0; i < str1.size(); i++) {
