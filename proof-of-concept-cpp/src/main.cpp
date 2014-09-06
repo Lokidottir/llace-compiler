@@ -4,6 +4,7 @@
 #include <string>
 #include <cstring>
 #include <vector>
+#include <pcre.h>
 #include "generic-btree.hpp"
 #include "EBNFTree.hpp"
 
@@ -17,6 +18,7 @@ std::string stripSubstr(const std::string& content, const std::string& toStrip) 
 
 int main(int argc, char** args) {
 	std::cout << "Circuit language compiler." << std::endl;
+	std::cout << "using pcre version: " << pcre_version() << std::endl;
 	std::string ebnf_filename;
 	for (int i = 0; i < argc - 1; i++) {
 		if (strcmp(args[i], "-ebnf") == 0) {

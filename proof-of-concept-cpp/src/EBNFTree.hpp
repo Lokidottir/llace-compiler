@@ -5,6 +5,7 @@
 #include <map>
 #include <utility>
 #include <regex>
+#include <pcre.h>
 #include <sstream>
 
 #ifndef PARSE_TYPE_DEFAULTS
@@ -12,6 +13,8 @@
 typedef uintmax_t uint_type;
 typedef double prec_type;
 #endif
+
+
 
 const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 	std::pair<std::string, std::string>("(*","*)"), //Comment
@@ -91,13 +94,13 @@ struct EBNFTree {
 				rhs += std::get<1>(between)[i];
 			}
 			std::stringstream regex_stream;
-			regex_stream << "(())" ;//"(?<=" << lhs << ")((.|\\n)*)(?=" << rhs << ")";
+			regex_stream << "(\\s\\S)" ;//"(?<=" << lhs << ")((.|\\n)*)(?=" << rhs << ")";
 			try {
-				std::regex reg(regex_stream.str(), std::regex_constants::extended);
+				std::regex reg(regex_stream.str(), std::regex::extended);
 				std::smatch regm;
 				if (std::regex_match(content,regm,reg)) {
 					for (uint_type i = 0; i < regm.size(); i++) {
-						if (regm.position(i) <= index && index <= uint_type(regm.position(i) + regm.length(i))) {
+						if (uint_type(regm.position(i)) <= index && index <= uint_type(regm.position(i) + regm.length(i) + 1)) {
 							return true;
 						}
 					}
