@@ -4,7 +4,7 @@
 #include <string>
 #include <cstring>
 #include <vector>
-#include <pcre.h>
+#include <pcrecpp.h>
 #include "generic-btree.hpp"
 #include "EBNFTree.hpp"
 
@@ -26,6 +26,5 @@ int main(int argc, char** args) {
 		}
 	}
 	EBNFTree::testProgram();
-	
 	return 0;
 }
