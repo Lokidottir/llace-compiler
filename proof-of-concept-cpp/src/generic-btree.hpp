@@ -25,16 +25,16 @@ class BNode {
 			this->right = nullptr;
 		}
 		
-		BNode(T value) : BNode() {
+		BNode(const T& value) : BNode() {
 			this->self = new T(value);
 		}
 		
 		BNode(const BNode<T>& copy) : BNode() {
-			this->self = new T(*tocopy.value);
-			if (tocopy.left != nullptr) {
+			this->self = new T(*copy.value);
+			if (copy.left != nullptr) {
 				this->left = new BNode<T>(*copy.left);
 			}
-			if (tocopy.right != nullptr) {
+			if (copy.right != nullptr) {
 				this->right = new BNode<T>(*copy.right);
 			}
 		}
@@ -74,6 +74,7 @@ class BNode {
 		}
 };
 
+template<class T>
 class Trie {
 	public:
 		T self;
@@ -82,7 +83,13 @@ class Trie {
 		Trie() : self(T()), data(std::vector<Trie<T> >()) {
 		}
 		
-		Trie(const Trie<T>& copy) : Trie(), self(copy.self), data(copy.data) {
+		Trie(const T& value) : Trie() {
+			this->self = value;
+		}
+		
+		Trie(const Trie<T>& copy) : Trie() {
+			this->self = copy.self;
+			this->data = copy.data;
 		}
 		
 		Trie(Trie<T>&& move) : Trie() {
@@ -90,8 +97,7 @@ class Trie {
 			std::swap(this->data,move.data);
 		}
 		
-		~Trie() {	
-		
+		~Trie() {
 		}
 		
 		Trie<T>& leftmost() {
@@ -103,14 +109,14 @@ class Trie {
 		}
 		
 		size_t size() {
-			total_size = 1;
+			size_t total_size = 1;
 			for (size_t i = 0; i < this->data.size(); i++) {
 				total_size += this->data[i].size();
 			}
 			return total_size;
 		}
 		
-		bool terminal() {
+		bool isterminal() {
 			return this->data.size() == 0;
 		}
 };

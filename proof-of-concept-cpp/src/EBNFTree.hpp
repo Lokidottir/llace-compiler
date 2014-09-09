@@ -58,97 +58,221 @@ bool oneOf(const T1& item, const T2& container) {
 	return oneOf<T1,T2>(item,container,container.size());
 }
 
-struct EBNFTree {
+
+namespace RegexHelper {
+	static std::vector<std::pair<std::string,uint_type> > getListOfMatches(pcrecpp::RE& reg, const std::string& content) {
+		/*
+			Static function, returns a vector of pairs that contain a string and
+			an unsigned integer. The string part of the pair is the matched	string,
+			while the unsigned integer is the position within the orginal content string.
+		*/
+		std::vector<std::pair<std::string, uint_type> > matches;
+		if (reg.PartialMatch(content)) {
+			pcrecpp::StringPiece wrk_content(content);
+			std::string matched_text;
+			uint_type cursor = 0;
+			while (reg.FindAndConsume(&wrk_content, &matched_text)) {
+				cursor = content.find(matched_text, cursor);
+				matches.push_back(std::pair<std::string,uint_type>(matched_text,cursor));
+				cursor++;
+			}
+			return matches;
+		}
+		else {
+			/*
+				There are no possible matches, return the empty vector.
+			*/
+			return matches;
+		}
+	}
+	
+	static void briefOnMatches(const std::string& regtxt, const std::string& content) {
+		pcrecpp::RE reg(regtxt);
+		std::cout << "Matches for regex " << regtxt << ":" << std::endl;
+		auto matches = RegexHelper::getListOfMatches(reg,content);
+		for (uint_type i = 0; i < matches.size(); i++) {
+			std::cout << "\t@" << std::get<1>(matches[i]) << "\tstr:" << std::get<0>(matches[i]) << std::endl; 
+		}
+	}
+	
+	static bool isContainedBy(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
+		/*
+			Static function, checks if a character within a string is contained
+			between two other specified strings.
+			
+			Example: isContainedBy("Hello world", 4,{"l","l"}) would return false
+			as the first instance of the containers are ajacent to eachother at
+			indexes 2 & 3. If the containment strings were {"ll","w"} then the
+			function would return true however as index 4 is between an instace
+			of the containers.
+			
+			Being between the containers INCLUDES being part of the container
+			strings.
+		*/
+		/*
+			This function, now implemented with PCRE, is costly. Avoid, unless you
+			don't really mind. Text parsing is kind of slow no matter what really.
+		*/
+		std::string lhs, rhs;
+		lhs = pcrecpp::RE::QuoteMeta(std::get<0>(between));
+		rhs = pcrecpp::RE::QuoteMeta(std::get<1>(between));
+		pcrecpp::RE reg_p((lhs != rhs) ? EBNF_REGEX_BETWEEN(lhs,rhs) : EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs));
+		std::vector<std::pair<std::string,uint_type> > matches = getListOfMatches(reg_p,content);
+		if (matches.size() > 0) {
+			//for (uint_type i = 0; i < matches.size(); i++) std::cout << "@ " << std::get<1>(matches[i]) << " str: " << std::get<0>(matches[i]) << std::endl;
+			//exit(0);
+			for (uint_type i = 0; i < matches.size(); i++) {
+				/*
+					Check if the index is between any instance.
+				*/
+				if (std::get<1>(matches[i]) <= index && index < std::get<1>(matches[i]) + std::get<0>(matches[i]).size()) return true;
+				//if (index == std::get<1>(matches[i])) return true;
+			}
+			/*
+				Control reches here before finding an instance, therefore no instance
+				contains the index
+			*/
+			return false;
+		}
+		else {
+			/*
+				There are no matches for the containment strings, so it is impossible
+				for the index to be within any instance.
+			*/
+			return false;
+		}
+	}
+	
+	static uint_type skipThrough(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
+		/*
+			Static function, moves the index integer to an index outside of
+			the container strings if it is between an instance. Returns the
+			next index outside of the container strings.
+		*/
+		if (isContainedBy(content,index,between)) {
+			return skipThrough(content,content.find(std::get<1>(between), index) + std::get<1>(between).size(),between);
+		}
+		else {
+			return index;
+		}
+	}
+};
+
+class EBNFElement {
+	private:
+		std::string identifier_;
+		std::string content_;
+		uint_type line_;
+		uint_type col_;
 	public:
 		
-		static std::vector<std::pair<std::string,uint_type> > getListOfMatches(pcrecpp::RE& reg, const std::string& content) {
-			/*
-				Static function, returns a vector of pairs that contain a string and
-				an unsigned integer. The string part of the pair is the matched	string,
-				while the unsigned integer is the position within the orginal content string.
-			*/
-			std::vector<std::pair<std::string, uint_type> > matches;
-			if (reg.PartialMatch(content)) {
-				pcrecpp::StringPiece wrk_content(content);
-				std::string matched_text;
-				uint_type cursor = 0;
-				while (reg.FindAndConsume(&wrk_content, &matched_text)) {
-					cursor = content.find(matched_text, cursor);
-					matches.push_back(std::pair<std::string,uint_type>(matched_text,cursor));
-					cursor++;
-				}
-				return matches;
-			}
-			else {
-				/*
-					There are no possible matches, return the empty vector.
-				*/
-				return matches;
-			}
+		EBNFElement() : identifier_(), content_(), line_(0), col_(0) {	
 		}
 		
-		static void testProgram();
-		static void briefOnMatches(const std::string&, const std::string&);
-		
-		static bool isContainedBy(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
-			/*
-				Static function, checks if a character within a string is contained
-				between two other specified strings.
-				
-				Example: isContainedBy("Hello world", 4,{"l","l"}) would return false
-				as the first instance of the containers are ajacent to eachother at
-				indexes 2 & 3. If the containment strings were {"ll","w"} then the
-				function would return true however as index 4 is between an instace
-				of the containers.
-				
-				Being between the containers INCLUDES being part of the container
-				strings.
-			*/
-			/*
-				This function, now implemented with PCRE, is costly. Avoid, unless you
-				don't really mind. Text parsing is kind of slow no matter what really.
-			*/
-			std::string lhs, rhs;
-			lhs = pcrecpp::RE::QuoteMeta(std::get<0>(between));
-			rhs = pcrecpp::RE::QuoteMeta(std::get<1>(between));
-			pcrecpp::RE reg_p((lhs != rhs) ? EBNF_REGEX_BETWEEN(lhs,rhs) : EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs));
-			std::vector<std::pair<std::string,uint_type> > matches = getListOfMatches(reg_p,content);
-			if (matches.size() > 0) {
-				//for (uint_type i = 0; i < matches.size(); i++) std::cout << "@ " << std::get<1>(matches[i]) << " str: " << std::get<0>(matches[i]) << std::endl;
-				//exit(0);
-				for (uint_type i = 0; i < matches.size(); i++) {
-					/*
-						Check if the index is between any instance.
-					*/
-					if (std::get<1>(matches[i]) <= index && index < std::get<1>(matches[i]) + std::get<0>(matches[i]).size()) return true;
-					//if (index == std::get<1>(matches[i])) return true;
-				}
-				/*
-					Control reches here before finding an instance, therefore no instance
-					contains the index
-				*/
-				return false;
-			}
-			else {
-				/*
-					There are no matches for the containment strings, so it is impossible
-					for the index to be within any instance.
-				*/
-				return false;
-			}
+		EBNFElement(const EBNFElement& copy) :  EBNFElement() {
+			this->identifier_ = copy.identifier_;
+			this->content_ = copy.content_;
+			this->line_ = copy.line_;
+			this->col_ = copy.col_;
 		}
 		
-		static uint_type skipThrough(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
-			/*
-				Static function, moves the index integer to an index outside of
-				the container strings if it is between an instance. Returns the
-				next index outside of the container strings.
-			*/
-			if (isContainedBy(content,index,between)) {
-				return skipThrough(content,content.find(std::get<1>(between), index) + std::get<1>(between).size(),between);
+		EBNFElement(EBNFElement&& move) {
+			std::swap(this->identifier_, move.identifier_);
+			std::swap(this->content_, move.content_);
+			std::swap(this->line_, move.line_);
+			std::swap(this->col_, move.col_);
+		}
+		
+		~EBNFElement() {	
+		}
+		
+		EBNFElement(const std::string& identifier_, const std::string& content_, const uint_type line_, const uint_type col_) {
+			this->identifier_ = identifier_;
+			this->content_ = content_;
+			this->line_ = line_;
+			this->col_ = col_;
+		}
+		
+		EBNFElement(const std::string& identifier_, const std::string& content_, const std::pair<uint_type,uint_type>& position) : EBNFElement(identifier_, content_, std::get<0>(position), std::get<1>(position)) {
+		}
+		
+		uint_type line() {
+			return this->line_;
+		}
+		
+		uint_type col() {
+			return this->col_;
+		}
+		
+		uint_type size() {
+			return this->content_.size();
+		}
+		
+		std::string content() {
+			return this->content_;
+		}
+		
+		std::string identifier() {
+			return this->identifier_;
+		}
+};
+
+std::string loadIntoString(std::string filename) {
+	std::fstream file_stream(filename.c_str(), std::ios::in);
+	if (file_stream.is_open()) {
+		std::string file_string;
+		std::string temp_str;
+		while (std::getline(file_stream, temp_str, '\n')) {
+			file_string += temp_str + '\n';
+		}
+		file_stream.close();
+		return file_string;
+	}
+	else {
+		file_stream.close();
+		return "";
+	}
+}
+
+class EBNFTree {
+	private:
+		std::string loaded_grammar;
+		
+	public:
+		std::map<std::string, std::string> id_rule_map;
+		std::map<std::string, pcrecpp::RE> regex_map;
+		
+		EBNFTree() : id_rule_map(), regex_map() {
+		}
+		
+		EBNFTree(const EBNFTree& copy) : EBNFTree() {
+			this->id_rule_map = copy.id_rule_map;
+			this->regex_map = copy.regex_map;
+			this->loaded_grammar = copy.loaded_grammar;
+		}
+		
+		EBNFTree(EBNFTree&& move) : EBNFTree() {
+			std::swap(this->id_rule_map, move.id_rule_map);
+			std::swap(this->regex_map, move.regex_map);
+			std::swap(this->loaded_grammar, move.loaded_grammar);
+		}
+		
+		const static uint_type flag_file = 0b0;
+		const static uint_type flag_string = 0b1;
+		
+		EBNFTree(const std::string& content, uint_type stringtype_flag = flag_string) : EBNFTree() {
+			if ((stringtype_flag & flag_string) != 0) {
+				/*
+					The string provided is a grammar in string form
+				*/
+				this->loadEBNF(content);
 			}
 			else {
-				return index;
+				/*
+					The string provided is a file location, load the
+					string from the file then process.
+				*/
+				this->loadEBNF(loadIntoString(content));
 			}
 		}
 		
@@ -178,38 +302,65 @@ struct EBNFTree {
 				return false;
 			}
 			//Find identifiers
-			this->loadIdentifiers("(**)");
-			
+			this->loadIdentifiers(content);
 			return false;
 		}
 		
-		std::map<std::string, std::string> id_rule_map;
+		void reloadEBNF() {
+			loadEBNF(std::string(this->loaded_grammar));
+		}
+		
+		/*
+			Append functions, for increasing the size of the grammar.
+		*/
+		
+		void append(const EBNFTree& tree) {
+			this->loaded_grammar += tree.loaded_grammar;
+			
+		}
+		
+		void append(const std::string& content) {
+			this->loaded_grammar += content;
+			
+		}
+		
+		EBNFTree& operator+= (const EBNFTree& tree) {
+			this->append(tree);
+			return *this;
+		}
+		
+		EBNFTree& operator+= (const std::string& grammar) {
+			this->append(grammar);
+			return *this;
+		}
+		
+		EBNFTree operator+ (const EBNFTree& tree) const {
+			EBNFTree tree_new(*this);
+			tree_new += tree;
+			return tree_new;
+		}
+		
+		EBNFTree operator+ (const std::string& grammar) const {
+			EBNFTree tree_new(*this);
+			tree_new += grammar;
+			return grammar;
+		}
+		
+		static void testProgram() {
+			std::string str1 = "something (* This (* is a *) (* comment *) *) {}(**) s { \"A string! abcd.\" { recursive D: } }";
+			std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
+			std::cout << str1 << std::endl;
+			for (uint_type i = 0; i < str1.size(); i++) {
+				std::cout << RegexHelper::isContainedBy(str1,i,EBNF_S_COMMENT);
+			}
+			std::cout << std::endl;
+			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("(*"),pcrecpp::RE::QuoteMeta("*)")), str1);
+			std::cout << "areas contained by {}:" << std::endl;
+			std::cout << str1 << std::endl;
+			for (uint_type i = 0; i < str1.size(); i++) {
+				std::cout << RegexHelper::isContainedBy(str1,i,EBNF_S_REPEAT);
+			}
+			std::cout << std::endl;
+			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("{"),pcrecpp::RE::QuoteMeta("}")), str1);
+		}
 };
-
-void EBNFTree::briefOnMatches(const std::string& regtxt, const std::string& content) {
-	pcrecpp::RE reg(regtxt);
-	std::cout << "Matches for regex " << regtxt << ":" << std::endl;
-	auto matches = EBNFTree::getListOfMatches(reg,content);
-	for (uint_type i = 0; i < matches.size(); i++) {
-		std::cout << "\t@" << std::get<1>(matches[i]) << "\tstr:" << std::get<0>(matches[i]) << std::endl; 
-	}
-}
-
-void EBNFTree::testProgram() {
-	std::string str1 = "something (* This (* is a *) (* comment *) *) {}(**) s { \"A string! abcd.\" { recursive D: } }";
-	std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
-	std::cout << str1 << std::endl;
-	for (uint_type i = 0; i < str1.size(); i++) {
-		std::cout << EBNFTree::isContainedBy(str1,i,EBNF_S_COMMENT);
-	}
-	std::cout << std::endl;
-	EBNFTree::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("(*"),pcrecpp::RE::QuoteMeta("*)")), str1);
-	std::cout << "areas contained by {}:" << std::endl;
-	std::cout << str1 << std::endl;
-	for (uint_type i = 0; i < str1.size(); i++) {
-		std::cout << EBNFTree::isContainedBy(str1,i,EBNF_S_REPEAT);
-	}
-	std::cout << std::endl;
-	EBNFTree::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("{"),pcrecpp::RE::QuoteMeta("}")), str1);
-	
-}
