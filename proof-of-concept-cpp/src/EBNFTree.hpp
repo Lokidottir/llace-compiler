@@ -38,11 +38,11 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_SPECIAL ebnf_cont_str[6]
 #define EBNF_S_ALL ebnf_cont_str
 
-#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("(("+lhs+")(?<="+lhs+")((|\\n|.)*)(?="+rhs+")("+rhs+"))")
+#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("(("+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))")
 #define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("(("+lhs+")([^"+rhs+"]*)("+rhs+"))")
 
-#define EBNF_REGEX_COMMENT "(\\(\\*)(?<=\\(\\*)((|\\n|.)*)(?=\\*\\))(\\*\\))"
-#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9]|_)+)(\\s*)(?=(=)((.|\\n)*)(;))"
+#define EBNF_REGEX_COMMENT "(\\(\\*)(?<=\\(\\*)((\\n|.)*)(?=\\*\\))(\\*\\))"
+#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9]|_| )+)(\\s*)(?=(=)((.|\\n)*)(;))"
 #define EBNF_REGEX_TERMSTR "((\")([^\"]*)(\"))|((')([^']*)('))"
 
 template<class T1, class T2>
@@ -88,6 +88,7 @@ struct EBNFTree {
 		}
 		
 		static void testProgram();
+		static void briefOnMatches(const std::string&, const std::string&);
 		
 		static bool isContainedBy(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
 			/*
@@ -113,8 +114,8 @@ struct EBNFTree {
 			pcrecpp::RE reg_p((lhs != rhs) ? EBNF_REGEX_BETWEEN(lhs,rhs) : EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs));
 			std::vector<std::pair<std::string,uint_type> > matches = getListOfMatches(reg_p,content);
 			if (matches.size() > 0) {
-				for (uint_type i = 0; i < matches.size(); i++) std::cout << "@ " << std::get<1>(matches[i]) << " str: " << std::get<0>(matches[i]) << std::endl;
-				exit(0);
+				//for (uint_type i = 0; i < matches.size(); i++) std::cout << "@ " << std::get<1>(matches[i]) << " str: " << std::get<0>(matches[i]) << std::endl;
+				//exit(0);
 				for (uint_type i = 0; i < matches.size(); i++) {
 					/*
 						Check if the index is between any instance.
@@ -181,22 +182,34 @@ struct EBNFTree {
 			
 			return false;
 		}
+		
 		std::map<std::string, std::string> id_rule_map;
 };
 
+void EBNFTree::briefOnMatches(const std::string& regtxt, const std::string& content) {
+	pcrecpp::RE reg(regtxt);
+	std::cout << "Matches for regex " << regtxt << ":" << std::endl;
+	auto matches = EBNFTree::getListOfMatches(reg,content);
+	for (uint_type i = 0; i < matches.size(); i++) {
+		std::cout << "\t@" << std::get<1>(matches[i]) << "\tstr:" << std::get<0>(matches[i]) << std::endl; 
+	}
+}
+
 void EBNFTree::testProgram() {
-	std::string str1 = "something (* This is a comment *) something between { \"A string! abcd.\" { recursive D: } in a repeat }";
-	/*std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
+	std::string str1 = "something (* This (* is a *) (* comment *) *) {}(**) s { \"A string! abcd.\" { recursive D: } }";
+	std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
 	std::cout << str1 << std::endl;
 	for (uint_type i = 0; i < str1.size(); i++) {
 		std::cout << EBNFTree::isContainedBy(str1,i,EBNF_S_COMMENT);
 	}
 	std::cout << std::endl;
-	*/std::cout << "areas contained by {}:" << std::endl;
+	EBNFTree::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("(*"),pcrecpp::RE::QuoteMeta("*)")), str1);
+	std::cout << "areas contained by {}:" << std::endl;
 	std::cout << str1 << std::endl;
 	for (uint_type i = 0; i < str1.size(); i++) {
 		std::cout << EBNFTree::isContainedBy(str1,i,EBNF_S_REPEAT);
 	}
 	std::cout << std::endl;
+	EBNFTree::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("{"),pcrecpp::RE::QuoteMeta("}")), str1);
 	
 }

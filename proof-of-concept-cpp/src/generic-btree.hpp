@@ -14,11 +14,11 @@ typedef double prec_type;
 
 template<class T>
 class BNode {
-	protected:
+	public:
 		T* self;
 		BNode<T>* left;
 		BNode<T>* right;
-	public:
+		
 		BNode() {
 			this->self = nullptr;
 			this->left = nullptr;
@@ -29,13 +29,13 @@ class BNode {
 			this->self = new T(value);
 		}
 		
-		BNode(const BNode<T>& tocopy) : BNode() {
+		BNode(const BNode<T>& copy) : BNode() {
 			this->self = new T(*tocopy.value);
 			if (tocopy.left != nullptr) {
-				this->left = new BNode<T>(*tocopy.left);
+				this->left = new BNode<T>(*copy.left);
 			}
 			if (tocopy.right != nullptr) {
-				this->right = new BNode<T>(*tocopy.right);
+				this->right = new BNode<T>(*copy.right);
 			}
 		}
 		
@@ -71,5 +71,46 @@ class BNode {
 			else {
 				return 0;
 			}
+		}
+};
+
+class Trie {
+	public:
+		T self;
+		std::vector<Trie<T> > data;
+		
+		Trie() : self(T()), data(std::vector<Trie<T> >()) {
+		}
+		
+		Trie(const Trie<T>& copy) : Trie(), self(copy.self), data(copy.data) {
+		}
+		
+		Trie(Trie<T>&& move) : Trie() {
+			std::swap(this->self,move.self);
+			std::swap(this->data,move.data);
+		}
+		
+		~Trie() {	
+		
+		}
+		
+		Trie<T>& leftmost() {
+			return this->data[0];
+		}
+		
+		Trie<T>& rightmost() {
+			return this->data[this->data.size() - 1];
+		}
+		
+		size_t size() {
+			total_size = 1;
+			for (size_t i = 0; i < this->data.size(); i++) {
+				total_size += this->data[i].size();
+			}
+			return total_size;
+		}
+		
+		bool terminal() {
+			return this->data.size() == 0;
 		}
 };
