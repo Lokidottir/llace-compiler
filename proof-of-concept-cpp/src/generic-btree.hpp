@@ -4,7 +4,6 @@
 #include <vector>
 #include <map>
 #include <utility>
-#include <regex>
 
 #ifndef PARSE_TYPE_DEFAULTS
 #define PARSE_TYPE_DEFAULTS
@@ -118,5 +117,124 @@ class Trie {
 		
 		bool isterminal() {
 			return this->data.size() == 0;
+		}
+};
+
+template<class T>
+class Stack {
+	private:
+		struct Node {
+			
+			Node* node;
+			T data;
+			
+			Node() : node(nullptr), data(T()) {
+			}
+			
+			Node(const Node& copy) : Node(){
+				this->data = copy.data;
+				if (copy.node != nullptr) this->node = new Node(*copy.node);
+			}
+			
+			Node(Node&& move) : Node() {
+				std::swap(this->data,move.data);
+				std::swap(this->node,move.node);
+			}
+			
+			Node(const T& data) : Node() {
+				this->data = data;
+			}
+			
+			~Node() {
+				delete this->node;
+			}
+			
+		};
+		
+		Node* stk;
+		
+		Node* topNode() {
+			Node* ptr = this->stk;
+			if (ptr != nullptr) while(ptr->node != nullptr) {
+				ptr = ptr->node;
+			}
+			return ptr;
+		}
+		
+	public:
+		
+		Stack() {
+			this->stk = nullptr;
+		}
+		
+		Stack(const Stack<T>& copy) : Stack() {
+			this->stk = new Node(*copy.stk);
+		}
+		
+		Stack(Stack<T>&& move) : Stack() {
+			this->stk = move.stk;
+			move.stk = nullptr;
+		}
+		
+		~Stack() {
+			delete this->stk;
+		}
+		
+		T& operator[] (size_t index) {
+			size_t wrk_index = 0;
+			Node* ptr = this->stk;
+			while (wrk_index < index && ptr != nullptr) {
+				ptr = ptr->node;
+			}
+			return ptr->data;
+		}
+		
+		T pop() {
+			T val;
+			Node* ptr = this->stk;
+			if (ptr == nullptr) {
+				return T();
+			}
+			else if (ptr->node == nullptr) {
+				std::swap(val,ptr->data);
+				
+			}
+			else {
+				while (ptr->node->node != nullptr) {
+					ptr = ptr->node;
+				}
+				std::swap(val,ptr->node->data);
+				delete ptr->node;
+				ptr->node = nullptr;
+			}
+			return val;
+		}
+		
+		void push(const T& data) {
+			if (this->stk == nullptr) {
+				this->stk = new Node(data);
+			}
+			else {
+				this->topNode()->node = new Node(data);
+			}
+		}
+		
+		bool contains(const T& val) {
+			Node* ptr = this->stk;
+			while (ptr != nullptr) {
+				if (ptr->data == val) return true;
+				ptr = ptr->node;
+			}
+			return false;
+		}
+		
+		size_t size() {
+			size_t wrk_size = 0;
+			Node* ptr = this->stk;
+			while (ptr != nullptr) {
+				wrk_size++;
+				ptr = ptr->node;
+			}
+			return wrk_size;
 		}
 };

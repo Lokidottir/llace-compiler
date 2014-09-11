@@ -5,7 +5,6 @@
 #include <cstring>
 #include <vector>
 #include <pcrecpp.h>
-#include "generic-btree.hpp"
 #include "EBNFTree.hpp"
 
 std::string stripSubstr(const std::string& content, const std::string& toStrip) {
