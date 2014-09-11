@@ -19,12 +19,27 @@ std::string stripSubstr(const std::string& content, const std::string& toStrip) 
 int main(int argc, char** args) {
 	std::cout << "Circuit language compiler." << std::endl;
 	std::cout << "using pcre version: " << pcre_version() << std::endl;
+	std::cout << "compiled at " << __TIME__ << " on " << __DATE__ << std::endl; 
 	std::string ebnf_filename;
 	for (int i = 0; i < argc - 1; i++) {
 		if (strcmp(args[i], "-ebnf") == 0) {
-			ebnf_filename = stripSubstr(stripSubstr(args[i + 1], "\""),"'");
+			ebnf_filename = args[i + 1];
 		}
 	}
-	EBNFTree::testProgram();
+	bool runtest = false;
+	for (int i = 0; i < argc && !runtest; i++) {
+		if (strcmp(args[i],"-test") == 0) {
+			runtest = true;
+		}
+	}
+	if (ebnf_filename.size() > 0) {
+		EBNFTree tree(ebnf_filename, EBNFTree::flag_file);
+		std::cout << "Loaded EBNF file from source: " << ebnf_filename << std::endl;
+		std::cout << "Grammar loaded:\n" << tree.grammar() << std::endl;
+		std::cout << "Rules loaded as:\n" << tree.briefRules() << std::endl;
+	}
+	if (runtest) {
+		EBNFTree::testProgram();
+	}
 	return 0;
 }

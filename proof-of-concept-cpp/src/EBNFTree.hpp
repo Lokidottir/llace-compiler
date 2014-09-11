@@ -38,12 +38,14 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_SPECIAL ebnf_cont_str[6]
 #define EBNF_S_ALL ebnf_cont_str
 
-#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("(("+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))")
-#define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("(("+lhs+")([^"+rhs+"]*)("+rhs+"))")
+#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))"
+#define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("((")+lhs+")([^"+rhs+"]*)("+rhs+"))"
 
-#define EBNF_REGEX_COMMENT "(\\(\\*)(?<=\\(\\*)((\\n|.)*)(?=\\*\\))(\\*\\))"
-#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9]|_| )+)(\\s*)(?=(=)((.|\\n)*)(;))"
-#define EBNF_REGEX_TERMSTR "((\")([^\"]*)(\"))|((')([^']*)('))"
+#define EBNF_REGEX_COMMENT EBNF_REGEX_BETWEEN("\\(\\*","\\*\\)")
+#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )+([a-zA-Z0-9]))(?=(\\s*)(\\=)((.|\\s)*)(;))"
+#define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
+#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)+)\\=[^;]*;)"
+#define EBNF_REGEX_TERMSTR "(((\")(([^\"]|(\\\\\"))*)(\"))|((')([^']*)(')))"
 
 template<class T1, class T2>
 bool oneOf(const T1& item, const T2& container, const uint_type size) {
@@ -60,18 +62,18 @@ bool oneOf(const T1& item, const T2& container) {
 
 
 namespace RegexHelper {
-	static std::vector<std::pair<std::string,uint_type> > getListOfMatches(pcrecpp::RE& reg, const std::string& content) {
+	std::vector<std::pair<std::string,uint_type> > getListOfMatches(const pcrecpp::RE& regex, const std::string& content) {
 		/*
 			Static function, returns a vector of pairs that contain a string and
 			an unsigned integer. The string part of the pair is the matched	string,
 			while the unsigned integer is the position within the orginal content string.
 		*/
 		std::vector<std::pair<std::string, uint_type> > matches;
-		if (reg.PartialMatch(content)) {
+		if (regex.PartialMatch(content)) {
 			pcrecpp::StringPiece wrk_content(content);
 			std::string matched_text;
 			uint_type cursor = 0;
-			while (reg.FindAndConsume(&wrk_content, &matched_text)) {
+			while (regex.FindAndConsume(&wrk_content, &matched_text)) {
 				cursor = content.find(matched_text, cursor);
 				matches.push_back(std::pair<std::string,uint_type>(matched_text,cursor));
 				cursor++;
@@ -86,16 +88,59 @@ namespace RegexHelper {
 		}
 	}
 	
-	static void briefOnMatches(const std::string& regtxt, const std::string& content) {
+	std::string nthMatch(const pcrecpp::RE& regex, const std::string& content, uint_type match_number = 0) {
+		/*
+			0-indexed nth match for a regex in string. if that match doesn't exist then
+			an empty string is returned.
+		*/
+		if (regex.PartialMatch(content)) {
+			pcrecpp::StringPiece wrk_content(content);
+			std::string matched_text;
+			uint_type i = 0; //The current match
+			while (regex.FindAndConsume(&wrk_content,&matched_text)) {
+				if (i == match_number) return matched_text;
+				i++;
+			}
+			/*
+				nth match was not found.
+			*/
+		}
+		return std::string();
+	}
+	
+	std::string firstMatch(const pcrecpp::RE& regex, const std::string& content) {
+		/*
+			Returns the first match of a regex, or an empty string if there are no matches.
+		*/
+		return nthMatch(regex,content,0);
+	}
+	
+	std::string lastMatch(const pcrecpp::RE& regex, const std::string& content) {
+		/*
+			Returns the last match of a regex, or an empty string if there are no matches.
+		*/
+		if (regex.PartialMatch(content)) {
+			pcrecpp::StringPiece wrk_content(content);
+			std::string matched_text;
+			std::string last_matched_text;
+			do {
+				last_matched_text = matched_text;
+			} while(regex.FindAndConsume(&wrk_content, &matched_text));
+			return last_matched_text;
+		}
+		return std::string();
+	}
+	
+	void briefOnMatches(const std::string& regtxt, const std::string& content) {
 		pcrecpp::RE reg(regtxt);
 		std::cout << "Matches for regex " << regtxt << ":" << std::endl;
 		auto matches = RegexHelper::getListOfMatches(reg,content);
 		for (uint_type i = 0; i < matches.size(); i++) {
-			std::cout << "\t@" << std::get<1>(matches[i]) << "\tstr:" << std::get<0>(matches[i]) << std::endl; 
+			std::cout << "\t@" << std::get<1>(matches[i]) << "\tstr: " << std::get<0>(matches[i]) << std::endl; 
 		}
 	}
 	
-	static bool isContainedBy(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
+	bool isContainedBy(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
 		/*
 			Static function, checks if a character within a string is contained
 			between two other specified strings.
@@ -143,7 +188,22 @@ namespace RegexHelper {
 		}
 	}
 	
-	static uint_type skipThrough(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
+	std::vector<bool> matchMask(const pcrecpp::RE& regex, const std::string& content) {
+		/*
+			Returns a vector of bools the same size as the content string, where each index
+			in the vector represents the content string's matched
+		*/
+		std::vector<bool> mask(content.size(), false);
+		auto matches = getListOfMatches(regex,content);
+		for (uint_type i = 0; i < matches.size(); i++) {
+			for (uint_type str_index = 0; str_index < matches[i].first.size(); str_index++) {
+				mask[str_index + matches[i].second] = true;
+			}
+		}
+		return mask;
+	}
+	
+	uint_type skipThrough(const std::string& content, uint_type index, const std::pair<std::string,std::string>& between) {
 		/*
 			Static function, moves the index integer to an index outside of
 			the container strings if it is between an instance. Returns the
@@ -155,6 +215,17 @@ namespace RegexHelper {
 		else {
 			return index;
 		}
+	}
+	
+	std::string& strip(const pcrecpp::RE& regex, std::string& content) {
+		pcrecpp::StringPiece wrk_content(content);
+		std::string matched_text;
+		if (regex.PartialMatch(content)) {
+			while(regex.FindAndConsume(&wrk_content,&matched_text)) {
+				content.erase(content.find(matched_text),matched_text.size());
+			}
+		}
+		return content;
 	}
 };
 
@@ -217,7 +288,7 @@ class EBNFElement {
 		}
 };
 
-std::string loadIntoString(std::string filename) {
+std::string loadIntoString(const std::string& filename) {
 	std::fstream file_stream(filename.c_str(), std::ios::in);
 	if (file_stream.is_open()) {
 		std::string file_string;
@@ -229,16 +300,22 @@ std::string loadIntoString(std::string filename) {
 		return file_string;
 	}
 	else {
+		std::cerr << "(File loading) Was not able to load file: " << filename << std::endl;
 		file_stream.close();
 		return "";
 	}
 }
 
+#define EBNF_ERROUT std::cerr << "(EBNF interpreter) Error: "
+#define EBNF_OUT std::cout << "(EBNF interpreter) "
+
 class EBNFTree {
 	private:
+	
 		std::string loaded_grammar;
 		
 	public:
+	
 		std::map<std::string, std::string> id_rule_map;
 		std::map<std::string, pcrecpp::RE> regex_map;
 		
@@ -265,49 +342,74 @@ class EBNFTree {
 				/*
 					The string provided is a grammar in string form
 				*/
-				this->loadEBNF(content);
+				this->load(content);
 			}
 			else {
 				/*
 					The string provided is a file location, load the
 					string from the file then process.
 				*/
-				this->loadEBNF(loadIntoString(content));
+				this->load(loadIntoString(content));
 			}
 		}
 		
-		bool loadIdentifiers(const std::string& content) {
+		bool fetchRules(const std::string& content) {
 			/*
-				Member for loading identifiers into the object, returns true if loading
-				was successful, false if there were any syntactic problems with 
+				Clears the current id/rule set and loads all the identifiers it can find
+				into 
 			*/
-			/*
-				Valid identifiers will not be within a terminal string or comment and
-				be immmediately preceded by either a space or a "=" also not commented
-				or within a terminal string.
-			*/
-			static std::vector<std::pair<std::string,std::string> > notBeWithin = {EBNF_S_COMMENT, EBNF_S_DOUBLEQ, EBNF_S_SINGLEQ};
+			this->id_rule_map = std::map<std::string, std::string>();
 			std::vector<std::string> identifiers;
+			/*
+				Strip content of comments before processing.
+			*/
+			std::string stripped_content(content);
+			RegexHelper::strip(EBNF_REGEX_COMMENT,stripped_content);
+			/*
+				Find each match for a rule delcaration.
+			*/
+			auto matches = RegexHelper::getListOfMatches(EBNF_REGEX_IDDECLR,stripped_content);
+			/*
+				Split each rule declaration into the identifier and the rule and load into
+				the id/rule map.
+			*/
+			for (uint_type i = 0; i < matches.size(); i++) {
+				this->id_rule_map[RegexHelper::firstMatch(EBNF_REGEX_ID, matches[i].first)] = RegexHelper::firstMatch(EBNF_REGEX_RULE, matches[i].first);
+			}
 			return false;
 		}
 		
-		bool loadEBNF(const std::string& content) {
+		void evaluateRules() {
+			if (this->id_rule_map.size() > 0) {
+				
+			}
+			else {
+				EBNF_ERROUT << "there are no regexes to evaluate." << std::endl;
+			}
+		}
+		
+		bool load(const std::string& content) {
 			/*
 				Member for loading a string representing an EBNF grammar into the
 				object.
 			*/
 			//First check the string has content.
 			if (content.size() == 0) {
-				std::cerr << "(EBNF interpreter) Error: string is empty, cannot read." << std::endl;
+				EBNF_ERROUT << "string is empty, cannot read." << std::endl;
 				return false;
 			}
+			this->loaded_grammar = content;
 			//Find identifiers
-			this->loadIdentifiers(content);
+			this->fetchRules(content);
+			this->evaluateRules();
 			return false;
 		}
 		
-		void reloadEBNF() {
-			loadEBNF(std::string(this->loaded_grammar));
+		void reload() {
+			/*
+				Reload the grammar
+			*/
+			this->load(std::string(this->loaded_grammar));
 		}
 		
 		/*
@@ -316,12 +418,12 @@ class EBNFTree {
 		
 		void append(const EBNFTree& tree) {
 			this->loaded_grammar += tree.loaded_grammar;
-			
+			this->reload();
 		}
 		
 		void append(const std::string& content) {
 			this->loaded_grammar += content;
-			
+			this->reload();
 		}
 		
 		EBNFTree& operator+= (const EBNFTree& tree) {
@@ -343,7 +445,31 @@ class EBNFTree {
 		EBNFTree operator+ (const std::string& grammar) const {
 			EBNFTree tree_new(*this);
 			tree_new += grammar;
-			return grammar;
+			return tree_new;
+		}
+		
+		uint_type size() {
+			/*
+				Returns the number of rules.
+			*/
+			return this->id_rule_map.size();
+		}
+		
+		std::string grammar() {
+			return this->loaded_grammar;
+		}
+		
+		std::string& referenceToGrammar() {
+			//Added for reasons of manual editing. Poor method name to dissuade.
+			return this->loaded_grammar;
+		}
+		
+		std::string briefRules() {
+			std::stringstream briefing;
+			for (auto& elem : this->id_rule_map) {
+				briefing << "\tid: " << elem.first << "\trule: " << elem.second << std::endl;
+			}
+			return briefing.str();
 		}
 		
 		static void testProgram() {
