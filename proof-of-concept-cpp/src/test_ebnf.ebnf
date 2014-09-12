@@ -1,6 +1,6 @@
 (* this is a comment *)
 (* this file is to test the EBNF interpreter, nothing else *)
-string = { letter };
+string = { letter | integer };
 letter = "A" | "F" | "Q";
 integer = non_0_digit, [ { any_digit } ];
 any_digit = "0" | non_0_digit;

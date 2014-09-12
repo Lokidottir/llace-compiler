@@ -146,7 +146,13 @@ class Stack {
 			}
 			
 			~Node() {
+				this->clean();
+			}
+			
+			void clean() {
+				if (this->node != nullptr) this->node->clean();
 				delete this->node;
+				this->node = nullptr;
 			}
 			
 		};
@@ -211,17 +217,13 @@ class Stack {
 		}
 		
 		void push(const T& data) {
-			if (this->stk == nullptr) {
-				this->stk = new Node(data);
-			}
-			else {
-				this->topNode()->node = new Node(data);
-			}
+			if (this->stk != nullptr) this->topNode()->node = new Node(data);
+			else this->stk = new Node(data);
 		}
 		
 		bool contains(const T& val) {
 			Node* ptr = this->stk;
-			while (ptr != nullptr) {
+			if (ptr != nullptr) while (ptr->node != nullptr) {
 				if (ptr->data == val) return true;
 				ptr = ptr->node;
 			}

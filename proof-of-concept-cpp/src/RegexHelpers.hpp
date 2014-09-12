@@ -8,6 +8,15 @@
 #include <pcrecpp.h>
 #include <sstream>
 
+#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))"
+#define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("((")+lhs+")([^"+rhs+"]*)("+rhs+"))"
+
+#ifndef PARSE_TYPE_DEFAULTS
+#define PARSE_TYPE_DEFAULTS
+typedef uintmax_t uint_type;
+typedef double prec_type;
+#endif
+
 template<class T1, class T2>
 bool oneOf(const T1& item, const T2& container, const uint_type size) {
 	for (uint_type i = 0; i < size; i++) {

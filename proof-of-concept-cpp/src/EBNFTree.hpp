@@ -40,13 +40,11 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_SPECIAL ebnf_cont_str[6]
 #define EBNF_S_ALL ebnf_cont_str
 
-#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))"
-#define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("((")+lhs+")([^"+rhs+"]*)("+rhs+"))"
-
 #define EBNF_REGEX_COMMENT EBNF_REGEX_BETWEEN("\\(\\*","\\*\\)")
-#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )+([a-zA-Z0-9]))(?=(\\s*)(\\=)((.|\\s)*)(;))"
+#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])*)(?=(\\s*)(\\=)((.|\\s)*)(;))"
 #define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
-#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)+)\\=[^;]*;)"
+#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)*)\\=[^;]*;)"
+#define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])*)"
 #define EBNF_REGEX_TERMSTR "(((\")(([^\"]|(\\\\\"))*)(\"))|((')([^']*)(')))"
 
 class EBNFElement {
@@ -134,20 +132,73 @@ class EBNFTree {
 	
 		std::string loaded_grammar;
 		
-		class DependancyStack {
-			private:
-				struct DPNode {
-					DPNode* next;
-					std::string ID;
-				};
-			public:
-				
-		};
-		
 	public:
-		
-		uint_type idDependancies() {
+	
+		std::vector<std::string> flatDepends(const std::string& identifier) {
+			/*	
+				Returns a vector containing all the identifiers that are required
+				without for their own requirements.
+			*/
+			std::vector<std::string> depends;
+			std::string rule_to_evaluate = this->id_rule_map[identifier];
+			std::vector<bool> terminal_mask = RegexHelper::matchMask(EBNF_REGEX_TERMSTR, rule_to_evaluate);
+			std::vector<std::pair<std::string, uint_type> > matches = RegexHelper::getListOfMatches(EBNF_REGEX_ID_LONE, rule_to_evaluate);
+			if (matches.size() == 0) return depends;
+			//RegexHelper::briefOnMatches(EBNF_REGEX_ID_LONE,rule_to_evaluate);
+			/*
+				Remove found dependancies within terminal strings
+			*/
+			for (uint_type i = matches.size() - 1; i >= 0 && i < matches.size(); i--) {
+				bool is_terminal = false;
+				if (!matches[i].first.empty())
+				for (uint_type str_index = 0; str_index < matches[i].first.size() && !is_terminal; str_index++) {
+					is_terminal = terminal_mask[str_index + matches[i].second];
+				}
+				if (is_terminal) {
+					matches.erase(matches.begin() + i);
+				}
+			}
 			
+			for (uint_type i = 0; i < matches.size(); i++) {
+				depends.push_back(matches[i].first);
+			}
+			return depends;
+		}
+
+		typedef Stack<std::string> DependsStack;
+		
+		uint_type idDepends(const std::string& identifier, DependsStack& stack) {
+			if (!stack.contains(identifier)) {
+				stack.push(identifier);
+				std::vector<std::string> depends_strs = this->flatDepends(identifier);
+				uint_type dependancies = depends_strs.size();
+				for (uint_type i = 0; i < depends_strs.size() && dependancies != 0; i++) {
+					if (!stack.contains(depends_strs[i])) {
+						dependancies += this->idDepends(depends_strs[i]);
+					}
+					else {
+						dependancies--;
+					}
+				}
+				stack.pop();
+				return dependancies;
+			}
+			else return 0;
+		}
+		
+		uint_type idDepends(const std::string& identifier) {
+			/*
+				Begins a search for the number of dependancies a given identifier has
+			*/
+			std::string rule_to_evaluate = this->id_rule_map[identifier];
+			DependsStack stack;
+			stack.push(identifier);
+			std::vector<std::string> depends_strs = this->flatDepends(identifier);
+			uint_type dependancies = depends_strs.size();
+			for (uint_type i = 0; depends_strs.size(); i++) {
+				dependancies += this->idDepends(depends_strs[i], stack);
+			}
+			return dependancies;
 		}
 		
 		std::map<std::string, std::string> id_rule_map;
@@ -210,10 +261,13 @@ class EBNFTree {
 			for (uint_type i = 0; i < matches.size(); i++) {
 				this->id_rule_map[RegexHelper::firstMatch(EBNF_REGEX_ID, matches[i].first)] = RegexHelper::firstMatch(EBNF_REGEX_RULE, matches[i].first);
 			}
-			return false;
+			return true;
 		}
 		
 		void evaluateRules() {
+			/*
+				Evaluate rules into regexes, todo
+			*/
 			if (this->id_rule_map.size() > 0) {
 				
 			}
@@ -301,7 +355,7 @@ class EBNFTree {
 		std::string briefRules() {
 			std::stringstream briefing;
 			for (auto& elem : this->id_rule_map) {
-				briefing << "\tid: " << elem.first << "\trule: " << elem.second << std::endl;
+				briefing << "\tid: " << elem.first << "\trule: " << elem.second << "\tdepends: " << this->idDepends(elem.first) << std::endl;
 			}
 			return briefing.str();
 		}

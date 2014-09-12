@@ -35,7 +35,7 @@ int main(int argc, char** args) {
 		EBNFTree tree(ebnf_filename, EBNFTree::flag_file);
 		std::cout << "Loaded EBNF file from source: " << ebnf_filename << std::endl;
 		std::cout << "Grammar loaded:\n" << tree.grammar() << std::endl;
-		std::cout << "Rules loaded as:\n" << tree.briefRules() << std::endl;
+		if (tree.size() > 0) std::cout << "Rules loaded as:\n" << tree.briefRules() << std::endl;
 	}
 	if (runtest) {
 		EBNFTree::testProgram();
