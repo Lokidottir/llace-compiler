@@ -8,8 +8,17 @@
 #include <pcrecpp.h>
 #include <sstream>
 
-#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")(([^"+lhs+rhs+"]|(?R))*)(?="+rhs+")("+rhs+"))"
+#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")((([^"+lhs+rhs+"])|(?R))*)(?="+rhs+")("+rhs+"))"
 #define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("((")+lhs+")([^"+rhs+"]*)("+rhs+"))"
+
+#ifndef EBNF_REGEX_BETWEEN
+#define EBNF_REGEX_BETWEEN(lhs,rhs)
+
+std::string genRegexBetweenStrings() {
+	return std::string();
+}
+
+#endif
 
 #ifndef PARSE_TYPE_DEFAULTS
 #define PARSE_TYPE_DEFAULTS

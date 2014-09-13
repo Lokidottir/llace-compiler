@@ -97,17 +97,20 @@ class Trie {
 		}
 		
 		~Trie() {
+			
 		}
 		
 		Trie<T>& leftmost() {
-			return this->data[0];
+			if (this->data.size() > 0)return this->data[0];
+			else return *this;
 		}
 		
 		Trie<T>& rightmost() {
-			return this->data[this->data.size() - 1];
+			if (this->data.size() > 0) return this->data[this->data.size() - 1];
+			else return *this;
 		}
 		
-		size_t size() {
+		size_t size() const {
 			size_t total_size = 1;
 			for (size_t i = 0; i < this->data.size(); i++) {
 				total_size += this->data[i].size();

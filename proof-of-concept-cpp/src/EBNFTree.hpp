@@ -45,7 +45,7 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
 #define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)*)\\=[^;]*;)"
 #define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])*)"
-#define EBNF_REGEX_TERMSTR "(((\")(([^\"]|(\\\\\"))*)(\"))|((')([^']*)(')))"
+#define EBNF_REGEX_TERMSTR "((([^\\\\]\")(([^\"]|(\\\\\"))*)([^\\\\]\"))|(([^\\\\]')([^']*)([^\\\\]')))"
 
 class EBNFElement {
 	private:
@@ -127,79 +127,71 @@ std::string loadIntoString(const std::string& filename) {
 #define EBNF_ERROUT std::cerr << "(EBNF interpreter) Error: "
 #define EBNF_OUT std::cout << "(EBNF interpreter) "
 
+namespace EvalEBNF {
+	
+	enum Type {
+		Special,
+		Repeat,
+		
+	};
+	
+	std::string stripComments(const std::string& content) {
+		/*
+			Strips all comments not contained within a string from an entire
+			EBNF grammar.
+		*/
+		auto comment_matches = RegexHelper::getListOfMatches(EBNF_REGEX_COMMENT, content);
+		auto string_matches = RegexHelper::getListOfMatches(EBNF_REGEX_TERMSTR, content);
+		for (uint_type iter = 0; iter < comment_matches.size(); iter++) {
+			bool contained_by_string;
+			for (uint_type str_m_index = 0; str_m_index < string_matches.size(); str_m_index++) {
+				/*
+					
+				*/
+			}
+			if (contained_by_string) {
+				//strip
+			}
+		}
+		return std::string();
+	}
+	
+	std::string determineType(const std::string& segment) {
+		
+	}
+	
+	std::string evalSegmentNoDepends(const std::string& segment) {
+		/*
+			The segment is garunteed to have no dependencies.
+		*/
+		std::string regex;
+		
+		return regex;
+	}
+	
+	std::string evalSegment(const std::string& segment, const std::map<std::string, std::string>& ruleset) {
+		/*
+			The segment may have dependencies
+		*/
+	}
+	
+	std::string evalNoDepends(const std::string& rule) {
+		/*
+			Evaluates a rule with no other rule dependencies.
+		*/
+		std::string wrk_rule(rule);
+		std::string regex;
+		
+		return regex;
+	}
+};
+
 class EBNFTree {
 	private:
 	
 		std::string loaded_grammar;
 		
 	public:
-	
-		std::vector<std::string> flatDepends(const std::string& identifier) {
-			/*	
-				Returns a vector containing all the identifiers that are required
-				without for their own requirements.
-			*/
-			std::vector<std::string> depends;
-			std::string rule_to_evaluate = this->id_rule_map[identifier];
-			std::vector<bool> terminal_mask = RegexHelper::matchMask(EBNF_REGEX_TERMSTR, rule_to_evaluate);
-			std::vector<std::pair<std::string, uint_type> > matches = RegexHelper::getListOfMatches(EBNF_REGEX_ID_LONE, rule_to_evaluate);
-			if (matches.size() == 0) return depends;
-			//RegexHelper::briefOnMatches(EBNF_REGEX_ID_LONE,rule_to_evaluate);
-			/*
-				Remove found dependancies within terminal strings
-			*/
-			for (uint_type i = matches.size() - 1; i >= 0 && i < matches.size(); i--) {
-				bool is_terminal = false;
-				if (!matches[i].first.empty())
-				for (uint_type str_index = 0; str_index < matches[i].first.size() && !is_terminal; str_index++) {
-					is_terminal = terminal_mask[str_index + matches[i].second];
-				}
-				if (is_terminal) {
-					matches.erase(matches.begin() + i);
-				}
-			}
-			
-			for (uint_type i = 0; i < matches.size(); i++) {
-				depends.push_back(matches[i].first);
-			}
-			return depends;
-		}
-
-		typedef Stack<std::string> DependsStack;
-		
-		uint_type idDepends(const std::string& identifier, DependsStack& stack) {
-			if (!stack.contains(identifier)) {
-				stack.push(identifier);
-				std::vector<std::string> depends_strs = this->flatDepends(identifier);
-				uint_type dependancies = depends_strs.size();
-				for (uint_type i = 0; i < depends_strs.size() && dependancies != 0; i++) {
-					if (!stack.contains(depends_strs[i])) {
-						dependancies += this->idDepends(depends_strs[i]);
-					}
-					else {
-						dependancies--;
-					}
-				}
-				stack.pop();
-				return dependancies;
-			}
-			else return 0;
-		}
-		
-		uint_type idDepends(const std::string& identifier) {
-			/*
-				Begins a search for the number of dependancies a given identifier has
-			*/
-			std::string rule_to_evaluate = this->id_rule_map[identifier];
-			DependsStack stack;
-			stack.push(identifier);
-			std::vector<std::string> depends_strs = this->flatDepends(identifier);
-			uint_type dependancies = depends_strs.size();
-			for (uint_type i = 0; depends_strs.size(); i++) {
-				dependancies += this->idDepends(depends_strs[i], stack);
-			}
-			return dependancies;
-		}
 		
 		std::map<std::string, std::string> id_rule_map;
 		std::map<std::string, pcrecpp::RE> regex_map;
@@ -345,19 +337,6 @@ class EBNFTree {
 		
 		std::string grammar() {
 			return this->loaded_grammar;
-		}
-		
-		std::string& referenceToGrammar() {
-			//Added for reasons of manual editing. Poor method name to dissuade.
-			return this->loaded_grammar;
-		}
-		
-		std::string briefRules() {
-			std::stringstream briefing;
-			for (auto& elem : this->id_rule_map) {
-				briefing << "\tid: " << elem.first << "\trule: " << elem.second << "\tdepends: " << this->idDepends(elem.first) << std::endl;
-			}
-			return briefing.str();
 		}
 		
 		static void testProgram() {
