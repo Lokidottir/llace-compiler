@@ -8,14 +8,42 @@
 #include <pcrecpp.h>
 #include <sstream>
 
-#define EBNF_REGEX_BETWEEN(lhs,rhs) std::string("((")+lhs+")(?<="+lhs+")((([^"+lhs+rhs+"])|(?R))*)(?="+rhs+")("+rhs+"))"
-#define EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs) std::string("((")+lhs+")([^"+rhs+"]*)("+rhs+"))"
 
 #ifndef EBNF_REGEX_BETWEEN
-#define EBNF_REGEX_BETWEEN(lhs,rhs)
+#define EBNF_REGEX_BETWEEN(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
+#define EBNF_REGEX_BETWEEN_SAME_CHARS(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 
-std::string genRegexBetweenStrings() {
-	return std::string();
+std::string genRegexBetweenStrings(const std::string& lhs, const std::string& rhs, bool inclusive = true) {
+	std::string wrk_lhs = pcrecpp::RE::QuoteMeta(lhs);
+	std::string wrk_rhs = pcrecpp::RE::QuoteMeta(rhs);
+	if (lhs == rhs) {
+		if (lhs.size() == 1) {
+			/*
+				Generate a regex that will match between two identical characters.
+			*/
+			if (inclusive) return "((" + wrk_lhs + ")([^" + wrk_rhs + "]*)(" + wrk_rhs + "))";
+			else {
+				return "((?<=" + wrk_lhs + ")([^" + wrk_rhs + "]*)(?=" + wrk_rhs + "))";
+			}
+		}
+		else {
+			/*
+				Generate a regex that will match between two identical strings.
+			*/
+			return std::string();
+		}
+	}
+	else {
+		/*
+			Generate a regex that will match between two non-identical strings
+		*/
+		std::string regex = "(";
+		if (inclusive) regex += "(" + wrk_lhs + ")";
+		regex += "(?<=" + wrk_lhs + ")((([^" + wrk_lhs + wrk_rhs + "])|(?R))*)(?=" + wrk_rhs + ")";
+		if (inclusive) regex += "(" + wrk_rhs + ")";
+		regex += ")";
+		return regex;
+	}
 }
 
 #endif
@@ -136,10 +164,7 @@ namespace RegexHelper {
 			This function, now implemented with PCRE, is costly. Avoid, unless you
 			don't really mind. Text parsing is kind of slow no matter what really.
 		*/
-		std::string lhs, rhs;
-		lhs = pcrecpp::RE::QuoteMeta(std::get<0>(between));
-		rhs = pcrecpp::RE::QuoteMeta(std::get<1>(between));
-		pcrecpp::RE reg_p((lhs != rhs) ? EBNF_REGEX_BETWEEN(lhs,rhs) : EBNF_REGEX_BETWEEN_SINGLE_CHARS(lhs,rhs));
+		pcrecpp::RE reg_p = EBNF_REGEX_BETWEEN(std::get<0>(between),std::get<1>(between));
 		std::vector<std::pair<std::string,uint_type> > matches = getListOfMatches(reg_p,content);
 		if (matches.size() > 0) {
 			//for (uint_type i = 0; i < matches.size(); i++) std::cout << "@ " << std::get<1>(matches[i]) << " str: " << std::get<0>(matches[i]) << std::endl;

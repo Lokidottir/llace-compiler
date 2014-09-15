@@ -127,61 +127,124 @@ std::string loadIntoString(const std::string& filename) {
 #define EBNF_ERROUT std::cerr << "(EBNF interpreter) Error: "
 #define EBNF_OUT std::cout << "(EBNF interpreter) "
 
+enum Type {
+	EBNF_TYPE_GROUP,
+	EBNF_TYPE_SPECIAL,
+	EBNF_TYPE_REPEAT,
+	EBNF_TYPE_TERMINAL,
+	EBNF_TYPE_OPTION,
+	EBNF_TYPE_NOTYPE,
+	EBNF_TYPE_RULE,
+	EBNF_TYPE_IDENTIFIER
+};
+
 namespace EvalEBNF {
 	
-	enum Type {
-		Special,
-		Repeat,
-		
-	};
+	typedef std::map<std::string,std::string> Ruleset;
+	
+	Type determineType(const std::string& segment) {
+		/*
+			Strip any leading or trailing whitespace
+		*/
+		return EBNF_TYPE_NOTYPE;
+	}
+	
 	
 	std::string stripComments(const std::string& content) {
 		/*
 			Strips all comments not contained within a string from an entire
 			EBNF grammar.
+			 
+			Not currently working entirely, would evaluate the centre of "(*" (* *) "*)"
+			as not a comment.
 		*/
 		auto comment_matches = RegexHelper::getListOfMatches(EBNF_REGEX_COMMENT, content);
-		auto string_matches = RegexHelper::getListOfMatches(EBNF_REGEX_TERMSTR, content);
-		for (uint_type iter = 0; iter < comment_matches.size(); iter++) {
-			bool contained_by_string;
-			for (uint_type str_m_index = 0; str_m_index < string_matches.size(); str_m_index++) {
-				/*
-					
-				*/
-			}
+		auto string_mask = RegexHelper::matchMask(EBNF_REGEX_TERMSTR, content);
+		std::string wrk_content = content;
+		for (uint_type iter = comment_matches.size() - 1; iter >= 0 && iter < comment_matches.size(); iter--) {
+			bool contained_by_string = (string_mask[comment_matches[iter].second]
+									|| string_mask[comment_matches[iter].second + 1]
+									|| string_mask[comment_matches[iter].second + comment_matches[iter].first.size() - 1]
+									|| string_mask[comment_matches[iter].second + comment_matches[iter].first.size() - 2]);
+			/*
+				Remove match from the comment array if any part of the containing strings
+				match as a string. 
+			*/
+			
 			if (contained_by_string) {
-				//strip
+				/*
+					Remove the comment match, reason unknown
+				*/
+				comment_matches.erase(comment_matches.begin() + iter);
+			}
+			else {
+				/*
+					Comment isn't within string, erase.
+				*/
+				wrk_content.erase(comment_matches[iter].second, comment_matches[iter].first.size());
 			}
 		}
-		return std::string();
+		return wrk_content;
 	}
 	
-	std::string determineType(const std::string& segment) {
-		
+	int segmentType(const std::string& segment) {
+		return EBNF_TYPE_NOTYPE;
 	}
 	
-	std::string evalSegmentNoDepends(const std::string& segment) {
-		/*
-			The segment is garunteed to have no dependencies.
-		*/
-		std::string regex;
+	std::vector<std::string> splitRule(const std::string& rule) {
+		std::vector<std::string> segments;
+		auto matches = RegexHelper::getListOfMatches("",rule);
+		for (uint_type iter = 0; iter < matches.size(); iter++) segments.push_back(matches[iter].first);
+		return segments;
+	}
+	
+	std::string evaluateSegment(const std::string& segment, const std::map<std::string,std::string>& ruleset) {
+		std::string regex = "(";
+		std::string match;
+		std::string match_recursive;
+		switch(segmentType(segment)) {
+			case EBNF_TYPE_SPECIAL:
+				/*
+					Evaluate special as inline regular expression.
+				*/
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("?","?",false),segment);
+				match_recursive = RegexHelper::firstMatch("((\\()\\?R\\))",match);
+				if (!match_recursive.empty()) { 
+					regex = std::string("(?P<") + ">(" + match + "))" + regex;
+				}
+				else {
+					
+				}
+				break;
+			case EBNF_TYPE_GROUP:
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("(",")",false),segment);
+				regex += evaluateSegment(match,ruleset);
+				break;
+			case EBNF_TYPE_TERMINAL:
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("\"","\"",false),segment);
+				regex += pcrecpp::RE::QuoteMeta(match.substr(1,match.size() - 2));
+				break;
+			case EBNF_TYPE_OPTION:
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("[","]",false),segment);
+				regex += evaluateSegment(match,ruleset);
+				break;
+			default:
+				EBNF_ERROUT << "EBNF segment: " << segment << "has no known type" << std::endl;
+				break;
+			}
 		
+		regex += ")";
 		return regex;
 	}
 	
-	std::string evalSegment(const std::string& segment, const std::map<std::string, std::string>& ruleset) {
-		/*
-			The segment may have dependencies
-		*/
-	}
-	
-	std::string evalNoDepends(const std::string& rule) {
+	std::string evaluate(const std::string& rule,const Ruleset& ruleset) {
 		/*
 			Evaluates a rule with no other rule dependencies.
 		*/
-		std::string wrk_rule(rule);
-		std::string regex;
-		
+		std::string regex = "(";
+		std::vector<std::string> segments = splitRule(rule);
+		for (uint_type iter = 0; iter < segments.size(); iter++) regex += evaluateSegment(segments[iter],ruleset); 
+		regex += ")";
 		return regex;
 	}
 };
@@ -343,18 +406,19 @@ class EBNFTree {
 			std::string str1 = "something (* This (* is a *) (* comment *) *) {}(**) s { \"A string! abcd.\" { recursive D: } }";
 			std::cout << "for string \"" << str1 << "\" the areas that count as contained by comments are:" << std::endl;
 			std::cout << str1 << std::endl;
-			for (uint_type i = 0; i < str1.size(); i++) {
-				std::cout << RegexHelper::isContainedBy(str1,i,EBNF_S_COMMENT);
-			}
-			std::cout << std::endl;
-			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("(*"),pcrecpp::RE::QuoteMeta("*)")), str1);
-			std::cout << "areas contained by {}:" << std::endl;
-			std::cout << str1 << std::endl;
-			auto matches_mask = RegexHelper::matchMask(EBNF_REGEX_BETWEEN("\\{","\\}"),str1);
+			auto matches_mask = RegexHelper::matchMask(EBNF_REGEX_BETWEEN("(*","*)"),str1);
 			for (uint_type i = 0; i < matches_mask.size(); i++) {
 				std::cout << matches_mask[i];
 			}
 			std::cout << std::endl;
-			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN(pcrecpp::RE::QuoteMeta("{"),pcrecpp::RE::QuoteMeta("}")), str1);
+			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN("(*","*)"), str1);
+			std::cout << "areas contained by {}:" << std::endl;
+			std::cout << str1 << std::endl;
+			matches_mask = RegexHelper::matchMask(EBNF_REGEX_BETWEEN("{","}"),str1);
+			for (uint_type i = 0; i < matches_mask.size(); i++) {
+				std::cout << matches_mask[i];
+			}
+			std::cout << std::endl;
+			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN("{","}"), str1);
 		}
 };
