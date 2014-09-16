@@ -7,6 +7,8 @@
 #include <regex>
 #include <pcrecpp.h>
 #include <sstream>
+#include <cstdlib>
+#include <stdexcept>
 #include "RegexHelpers.hpp"
 #include "generic-btree.hpp"
 
@@ -193,71 +195,191 @@ namespace EvalEBNF {
 	
 	std::vector<std::string> splitRule(const std::string& rule) {
 		std::vector<std::string> segments;
-		auto matches = RegexHelper::getListOfMatches("",rule);
+		auto matches = RegexHelper::getListOfMatches(",",rule);
 		for (uint_type iter = 0; iter < matches.size(); iter++) segments.push_back(matches[iter].first);
 		return segments;
 	}
 	
-	std::string evaluateSegment(const std::string& segment, const std::map<std::string,std::string>& ruleset) {
+	std::string evaluateSegment(const std::string& segment, 
+								const Ruleset& ruleset, 
+								Stack<std::string>& id_stack,
+								Stack<std::string>& depend_stack) {
 		std::string regex = "(";
 		std::string match;
 		std::string match_recursive;
-		switch(segmentType(segment)) {
+		switch (segmentType(segment)) {
 			case EBNF_TYPE_SPECIAL:
 				/*
 					Evaluate special as inline regular expression.
 				*/
-				match = RegexHelper::firstMatch(genRegexBetweenStrings("?","?",false),segment);
-				match_recursive = RegexHelper::firstMatch("((\\()\\?R\\))",match);
-				if (!match_recursive.empty()) { 
-					regex = std::string("(?P<") + ">(" + match + "))" + regex;
+				/*
+					Find the Regex embedded in the special with Perl notation:
+					eg:
+						? /[a-z]+/ ?
+					will evaluate to [a-z]+.
+				*/
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("/","/",true),segment);
+				match_recursive = RegexHelper::firstMatch(pcrecpp::RE::QuoteMeta("(?R)"),match);
+				if (!match_recursive.empty()) {
+					/*
+						There is an instance of self-recusion within the inlined regex, this needs
+						to be processed as a named group that recurses itself and amended to the 
+						beginning of the regular expression.
+					*/
+					uint_type id_num = ~(uint_type(0)); //Maximum number, counting down.
+					std::stringstream generated_id;
+					do {
+						generated_id.str(std::string());
+						generated_id.clear();
+						generated_id << id_stack[0] << "_" << id_num;
+						id_num--;
+					} while(id_stack.contains(generated_id.str()) && id_num != 0);
+					/*
+						A unique ID has been generated and must be pushed to the stack to prevent 
+						a duplicate.
+					*/
+					id_stack.push(generated_id.str());
+					/*
+						Replace all instances of "(?R)" with \g'generated_id'
+					*/
+					std::string replace_with = "\\g'" + generated_id.str() + "'";
+					pcrecpp::RE(pcrecpp::RE::QuoteMeta("(?R)")).GlobalReplace(replace_with.c_str(),&match);
+					regex = std::string("((?P<") + generated_id.str() + ">(" + match + ")){0})" + regex;
 				}
 				else {
-					
+					/*
+						Regex contains no instance of "(?R)" self-recursion, and needs no further
+						processing.
+					*/
+					regex += match.substr(1,match.size() - 2);
 				}
 				break;
 			case EBNF_TYPE_GROUP:
+				/*
+					Get the non-inclusive match and pass it down to be further evaluated.
+				*/
 				match = RegexHelper::firstMatch(genRegexBetweenStrings("(",")",false),segment);
-				regex += evaluateSegment(match,ruleset);
+				regex += (std::string("(") + evaluateSegment(match,ruleset,id_stack,depends_stack) + ")");
 				break;
 			case EBNF_TYPE_TERMINAL:
-				match = RegexHelper::firstMatch(genRegexBetweenStrings("\"","\"",false),segment);
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("\"","\"",true),segment);
 				regex += pcrecpp::RE::QuoteMeta(match.substr(1,match.size() - 2));
 				break;
 			case EBNF_TYPE_OPTION:
 				match = RegexHelper::firstMatch(genRegexBetweenStrings("[","]",false),segment);
-				regex += evaluateSegment(match,ruleset);
+				regex += evaluateSegment(match,ruleset,id_stack,depends_stack);
 				break;
 			default:
-				EBNF_ERROUT << "EBNF segment: " << segment << "has no known type" << std::endl;
+				EBNF_ERROUT << "rule segment \"" << segment << "\" has no known evaluation type" << std::endl;
 				break;
-			}
-		
+		}
 		regex += ")";
 		return regex;
 	}
 	
-	std::string evaluate(const std::string& rule,const Ruleset& ruleset) {
+	struct EvaluatedRule {
+		std::string rule_id;
+		std::string original;
+		std::string regex;
+		std::vector<std::string> dependencies;
+		
+		EvaluatedRule() : rule_id(), original(), regex(), dependencies() {
+		}
+		
+		EvaluatedRule(const EvaluatedRule& copy) : EvaluatedRule() {
+			this->original = copy.original;
+			this->regex = copy.regex;
+			this->dependencies = copy.dependencies;
+			this->rule_id = copy.rule_id;
+		}
+		
+		EvaluatedRule(EvaluatedRule&& move) : EvaluatedRule() {
+			std::swap(this->rule_id,move.rule_id);
+			std::swap(this->original,move.original);
+			std::swap(this->regex,move.regex);
+			std::swap(this->dependencies,move.dependencies);
+		}
+		
+		EvaluatedRule(const std::string rule_id, 
+					  const std::string original, 
+					  const std::string regex, 
+					  const std::vector<std::string> dependencies) : EvaluatedRule() {
+			this->rule_id = rule_id;
+			this->original = original;
+			this->regex = regex;
+			this->dependencies = dependencies;
+		}
+		
+		~EvaluatedRule() {
+		}
+		
+		std::string assemble(const std::map<std::string,EvaluatedRule>& rules) const {
+			Stack<std::string> depends_stack;
+			return this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'";
+		}
+		
+		std::string assembleNocall(const std::map<std::string,EvaluatedRule>& rules, Stack<std::string>& depends_stack) const {
+			std::string assembled;
+			depends_stack.push(this->rule_id)
+			for (uint_type i = 0; i < this->dependencies.size(); i++) {
+				try {
+					/*
+						Add dependency only if it's not already in the stack
+					*/
+					if (!depends_stack.contains(dependencies[i])) assembled += rules.at(dependencies[i]).assembleNocall();
+				}
+				catch (const std::out_of_range& oor) {
+					EBNF_ERROUT << "fetching rule with ID " << dependencies[i] << " for assembly threw out of range error with: " << oor.what() << std::endl;
+					return "";
+				}
+			}
+			assembled += this->regex;
+			return assembled;
+		}
+	};
+	
+	EvaluatedRule evaluate(const std::string& rule_id, const Ruleset& ruleset) {
 		/*
 			Evaluates a rule with no other rule dependencies.
+			Note: declaring a named expression as ((?P<name>(group)){0}) essentially works
+			as a function declaration, able to be called later with \g'name' ect.
 		*/
-		std::string regex = "(";
-		std::vector<std::string> segments = splitRule(rule);
-		for (uint_type iter = 0; iter < segments.size(); iter++) regex += evaluateSegment(segments[iter],ruleset); 
-		regex += ")";
-		return regex;
+		std::string regex = "((?P<" + rule_id + ">(";
+		std::vector<std::string> segments;
+		try {
+			segments = splitRule(ruleset.at(rule_id));
+		}
+		catch (const std::out_of_range& oor) {
+			EBNF_ERROUT << "fetching ID " << rule_id << " from ruleset threw out of range error with: " << oor.what() << std::endl;
+			return "";
+		}
+		/*
+			The ID stack just acts as a container for what IDs are currently declared. A stack
+			seems like an illogical choice but it's the easiest declared type with a contained.
+		*/
+		Stack<std::string> depend_stack;
+		Stack<std::string> id_stack;
+		id_stack.push(rule_id);
+		for (uint_type iter = 0; iter < segments.size(); iter++) regex += evaluateSegment(segments[iter],ruleset,id_stack,depends_stack); 
+		regex += ")){0})";
+		for () {
+			
+		}
+		EvaluatedRule rule(rule_id);
+		
+		return rule;
 	}
 };
 
 class EBNFTree {
 	private:
-	
+		
 		std::string loaded_grammar;
 		
 	public:
 		
-		std::map<std::string, std::string> id_rule_map;
-		std::map<std::string, pcrecpp::RE> regex_map;
+		EvalEBNF::Ruleset id_rule_map;
+		std::map<std::string,EvalEBNF::EvaluatedRule> regex_map;
 		
 		EBNFTree() : id_rule_map(), regex_map() {
 		}
@@ -286,8 +408,8 @@ class EBNFTree {
 			}
 			else {
 				/*
-					The string provided is a file location, load the
-					string from the file then process.
+					The string provided is a file location, load the string from the file 
+					then process.
 				*/
 				this->load(loadIntoString(content));
 			}
@@ -324,7 +446,9 @@ class EBNFTree {
 				Evaluate rules into regexes, todo
 			*/
 			if (this->id_rule_map.size() > 0) {
-				
+				//for () {
+					
+				//}
 			}
 			else {
 				EBNF_ERROUT << "there are no rules to evaluate." << std::endl;
@@ -420,5 +544,13 @@ class EBNFTree {
 			}
 			std::cout << std::endl;
 			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN("{","}"), str1);
+			std::cout << "terminal strings:" << std::endl;
+			std::cout << str1 << std::endl;
+			matches_mask = RegexHelper::matchMask(EBNF_REGEX_BETWEEN("\"","\""),str1);
+			for (uint_type i = 0; i < matches_mask.size(); i++) {
+				std::cout << matches_mask[i];
+			}
+			std::cout << std::endl;
+			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN("\"","\""),str1);
 		}
 };

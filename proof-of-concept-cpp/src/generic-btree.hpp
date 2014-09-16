@@ -161,6 +161,7 @@ class Stack {
 		};
 		
 		Node* stk;
+		size_t logical_size;
 		
 		Node* topNode() {
 			Node* ptr = this->stk;
@@ -174,15 +175,18 @@ class Stack {
 		
 		Stack() {
 			this->stk = nullptr;
+			this->logical_size = 0;
 		}
 		
 		Stack(const Stack<T>& copy) : Stack() {
 			this->stk = new Node(*copy.stk);
+			this->logical_size = copy.logical_size;
 		}
 		
 		Stack(Stack<T>&& move) : Stack() {
 			this->stk = move.stk;
 			move.stk = nullptr;
+			this->logical_size = move.logical_size;
 		}
 		
 		~Stack() {
@@ -216,12 +220,14 @@ class Stack {
 				delete ptr->node;
 				ptr->node = nullptr;
 			}
+			if (this->logical_size > 0) this->logical_size--;
 			return val;
 		}
 		
 		void push(const T& data) {
 			if (this->stk != nullptr) this->topNode()->node = new Node(data);
 			else this->stk = new Node(data);
+			this->logical_size++;
 		}
 		
 		bool contains(const T& val) {
@@ -234,12 +240,12 @@ class Stack {
 		}
 		
 		size_t size() {
-			size_t wrk_size = 0;
-			Node* ptr = this->stk;
-			while (ptr != nullptr) {
-				wrk_size++;
-				ptr = ptr->node;
-			}
-			return wrk_size;
+			return this->logical_size;
+		}
+		
+		T top() {
+			Node* ptr = this->topNode();
+			if (ptr != nullptr) return ptr->data;
+			else return T();
 		}
 };

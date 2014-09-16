@@ -7,9 +7,9 @@
 #include <regex>
 #include <pcrecpp.h>
 #include <sstream>
+#include <cstdlib>
 
 
-#ifndef EBNF_REGEX_BETWEEN
 #define EBNF_REGEX_BETWEEN(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 #define EBNF_REGEX_BETWEEN_SAME_CHARS(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 
@@ -45,8 +45,6 @@ std::string genRegexBetweenStrings(const std::string& lhs, const std::string& rh
 		return regex;
 	}
 }
-
-#endif
 
 #ifndef PARSE_TYPE_DEFAULTS
 #define PARSE_TYPE_DEFAULTS
