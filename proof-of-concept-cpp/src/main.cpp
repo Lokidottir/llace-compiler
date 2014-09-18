@@ -5,7 +5,7 @@
 #include <cstring>
 #include <vector>
 #include <pcrecpp.h>
-#include "EBNFTree.hpp"
+#include "EBNF.hpp"
 
 std::string stripSubstr(const std::string& content, const std::string& toStrip) {
 	std::string altered_content(content);
@@ -35,6 +35,11 @@ int main(int argc, char** args) {
 		EBNFTree tree(ebnf_filename, EBNFTree::flag_file);
 		std::cout << "Loaded EBNF file from source: " << ebnf_filename << std::endl;
 		std::cout << "Grammar loaded:\n" << tree.grammar() << std::endl;
+		std::cout << "Grammar evaluated to:" << std::endl;
+		for (auto& elem : tree.regex_map) {
+			std::cout << "\tRule \"" << elem.first << "\" as:" << std::endl;
+			std::cout << "\t\t" << elem.second.regex << std::endl;
+		}
 	}
 	if (runtest) {
 		EBNFTree::testProgram();

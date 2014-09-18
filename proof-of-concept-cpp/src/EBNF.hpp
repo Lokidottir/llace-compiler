@@ -43,10 +43,10 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_ALL ebnf_cont_str
 
 #define EBNF_REGEX_COMMENT EBNF_REGEX_BETWEEN("\\(\\*","\\*\\)")
-#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])*)(?=(\\s*)(\\=)((.|\\s)*)(;))"
+#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)(?=(\\s*)(\\=)((.|\\s)*)(;))"
 #define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
 #define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)*)\\=[^;]*;)"
-#define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])*)"
+#define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)"
 #define EBNF_REGEX_TERMSTR "((([^\\\\]\")(([^\"]|(\\\\\"))*)([^\\\\]\"))|(([^\\\\]')([^']*)([^\\\\]')))"
 
 class EBNFElement {
@@ -137,7 +137,8 @@ enum Type {
 	EBNF_TYPE_OPTION,
 	EBNF_TYPE_NOTYPE,
 	EBNF_TYPE_RULE,
-	EBNF_TYPE_IDENTIFIER
+	EBNF_TYPE_IDENTIFIER,
+	EBNF_TYPE_ALTERNATION
 };
 
 namespace EvalEBNF {
@@ -190,12 +191,29 @@ namespace EvalEBNF {
 	}
 	
 	int segmentType(const std::string& segment) {
+		std::string wrk_segment = RegexHelper::firstMatch("",segment);
+		if (RegexHelper::firstMatch(EBNF_REGEX_TERMSTR,segment) == segment) {
+			return EBNF_TYPE_TERMINAL;
+		}
+		else {
+			
+		}
 		return EBNF_TYPE_NOTYPE;
 	}
 	
 	std::vector<std::string> splitRule(const std::string& rule) {
 		std::vector<std::string> segments;
-		auto matches = RegexHelper::getListOfMatches(",",rule);
+		static std::string regex;
+		if (regex.empty()) {
+			regex = "(";
+			for (uint_type iter = 0; iter < EBNF_S_ALL.size(); iter++) {
+				regex += (genRegexBetweenStrings(EBNF_S_ALL[iter].first,EBNF_S_ALL[iter].second));
+				if (iter < EBNF_S_ALL.size() - 1) regex += "|";
+			}
+			regex += ")";
+			std::cout << "generated rule-split regex as: " << regex << std::endl; 
+		}
+		auto matches = RegexHelper::getListOfMatches(regex,rule);
 		for (uint_type iter = 0; iter < matches.size(); iter++) segments.push_back(matches[iter].first);
 		return segments;
 	}
@@ -203,10 +221,12 @@ namespace EvalEBNF {
 	std::string evaluateSegment(const std::string& segment, 
 								const Ruleset& ruleset, 
 								Stack<std::string>& id_stack,
-								Stack<std::string>& depend_stack) {
+								Stack<std::string>& depends_stack) {
 		std::string regex = "(";
 		std::string match;
 		std::string match_recursive;
+		std::vector<std::string> rules;
+		std::string id_found;
 		switch (segmentType(segment)) {
 			case EBNF_TYPE_SPECIAL:
 				/*
@@ -269,6 +289,17 @@ namespace EvalEBNF {
 				match = RegexHelper::firstMatch(genRegexBetweenStrings("[","]",false),segment);
 				regex += evaluateSegment(match,ruleset,id_stack,depends_stack);
 				break;
+			case EBNF_TYPE_IDENTIFIER:
+				id_found = RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment);
+				depends_stack.push(id_found);
+				regex += ("\\g'" + id_found + "'");
+				break;
+			case EBNF_TYPE_RULE:
+				rules = splitRule(segment);
+				for (uint_type iter = 0; iter < rules.size(); iter++) {
+					regex += evaluateSegment(rules[iter],ruleset,id_stack,depends_stack);
+				}
+				break;
 			default:
 				EBNF_ERROUT << "rule segment \"" << segment << "\" has no known evaluation type" << std::endl;
 				break;
@@ -313,20 +344,33 @@ namespace EvalEBNF {
 		~EvaluatedRule() {
 		}
 		
+		EvaluatedRule& operator= (const EvaluatedRule& copy) {
+			this->rule_id = copy.rule_id;
+			this->original = copy.original;
+			this->regex = copy.regex;
+			this->dependencies = copy.dependencies;
+			return *this;
+		}
+		
 		std::string assemble(const std::map<std::string,EvaluatedRule>& rules) const {
 			Stack<std::string> depends_stack;
-			return this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'";
+			std::string regex = this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'";
+			std::string dependencies;
+			for (uint_type i = depends_stack.size() - 1; i == depends_stack.size() - 1; i--) {
+				dependencies += depends_stack.pop();
+			}
+			return dependencies + regex;
 		}
 		
 		std::string assembleNocall(const std::map<std::string,EvaluatedRule>& rules, Stack<std::string>& depends_stack) const {
 			std::string assembled;
-			depends_stack.push(this->rule_id)
+			depends_stack.push(this->rule_id);
 			for (uint_type i = 0; i < this->dependencies.size(); i++) {
 				try {
 					/*
 						Add dependency only if it's not already in the stack
 					*/
-					if (!depends_stack.contains(dependencies[i])) assembled += rules.at(dependencies[i]).assembleNocall();
+					if (!depends_stack.contains(dependencies[i])) assembled += rules.at(dependencies[i]).assembleNocall(rules,depends_stack);
 				}
 				catch (const std::out_of_range& oor) {
 					EBNF_ERROUT << "fetching rule with ID " << dependencies[i] << " for assembly threw out of range error with: " << oor.what() << std::endl;
@@ -350,23 +394,31 @@ namespace EvalEBNF {
 			segments = splitRule(ruleset.at(rule_id));
 		}
 		catch (const std::out_of_range& oor) {
-			EBNF_ERROUT << "fetching ID " << rule_id << " from ruleset threw out of range error with: " << oor.what() << std::endl;
-			return "";
+			EBNF_ERROUT << "fetching ID " << rule_id << " from ruleset threw out of range error: " << oor.what() << std::endl;
+			return EvaluatedRule();
 		}
 		/*
 			The ID stack just acts as a container for what IDs are currently declared. A stack
 			seems like an illogical choice but it's the easiest declared type with a contained.
 		*/
-		Stack<std::string> depend_stack;
+		Stack<std::string> depends_stack;
 		Stack<std::string> id_stack;
+		/*
+			Push the given ID on to the stack.
+		*/
 		id_stack.push(rule_id);
 		for (uint_type iter = 0; iter < segments.size(); iter++) regex += evaluateSegment(segments[iter],ruleset,id_stack,depends_stack); 
 		regex += ")){0})";
-		for () {
-			
+		EvaluatedRule rule;
+		/*
+			Manually copy data to the rule.
+		*/
+		rule.rule_id = rule_id;
+		rule.original = ruleset.at(rule_id);
+		rule.regex = regex;
+		for (uint_type i = 0; i < depends_stack.size(); i++) {
+			rule.dependencies.push_back(depends_stack[i]);
 		}
-		EvaluatedRule rule(rule_id);
-		
 		return rule;
 	}
 };
@@ -375,6 +427,47 @@ class EBNFTree {
 	private:
 		
 		std::string loaded_grammar;
+		
+		bool fetchRules(const std::string& content) {
+			/*
+				Clears the current id/rule set and loads all the identifiers it can find
+				into 
+			*/
+			this->id_rule_map = std::map<std::string, std::string>();
+			std::vector<std::string> identifiers;
+			/*
+				Strip content of comments before processing.
+			*/
+			std::string stripped_content(content);
+			RegexHelper::strip(EBNF_REGEX_COMMENT,stripped_content);
+			/*
+				Find each match for a rule delcaration.
+			*/
+			auto matches = RegexHelper::getListOfMatches(EBNF_REGEX_IDDECLR,stripped_content);
+			/*
+				Split each rule declaration into the identifier and the rule and load into
+				the id/rule map.
+			*/
+			for (uint_type i = 0; i < matches.size(); i++) {
+				this->id_rule_map[RegexHelper::firstMatch(EBNF_REGEX_ID, matches[i].first)] = RegexHelper::firstMatch(EBNF_REGEX_RULE, matches[i].first);
+			}
+			return true;
+		}
+		
+		void evaluateRules() {
+			/*
+				Evaluate rules into regexes, todo
+			*/
+			if (this->id_rule_map.size() > 0) {
+				EBNF_OUT << "beginning evaluation of rules..." << std::endl;
+				for (auto& elem : this->id_rule_map) {
+					this->regex_map[elem.first] = EvalEBNF::evaluate(elem.first,this->id_rule_map);
+				}
+			}
+			else {
+				EBNF_ERROUT << "there are no rules to evaluate." << std::endl;
+			}
+		}
 		
 	public:
 		
@@ -412,46 +505,6 @@ class EBNFTree {
 					then process.
 				*/
 				this->load(loadIntoString(content));
-			}
-		}
-		
-		bool fetchRules(const std::string& content) {
-			/*
-				Clears the current id/rule set and loads all the identifiers it can find
-				into 
-			*/
-			this->id_rule_map = std::map<std::string, std::string>();
-			std::vector<std::string> identifiers;
-			/*
-				Strip content of comments before processing.
-			*/
-			std::string stripped_content(content);
-			RegexHelper::strip(EBNF_REGEX_COMMENT,stripped_content);
-			/*
-				Find each match for a rule delcaration.
-			*/
-			auto matches = RegexHelper::getListOfMatches(EBNF_REGEX_IDDECLR,stripped_content);
-			/*
-				Split each rule declaration into the identifier and the rule and load into
-				the id/rule map.
-			*/
-			for (uint_type i = 0; i < matches.size(); i++) {
-				this->id_rule_map[RegexHelper::firstMatch(EBNF_REGEX_ID, matches[i].first)] = RegexHelper::firstMatch(EBNF_REGEX_RULE, matches[i].first);
-			}
-			return true;
-		}
-		
-		void evaluateRules() {
-			/*
-				Evaluate rules into regexes, todo
-			*/
-			if (this->id_rule_map.size() > 0) {
-				//for () {
-					
-				//}
-			}
-			else {
-				EBNF_ERROUT << "there are no rules to evaluate." << std::endl;
 			}
 		}
 		

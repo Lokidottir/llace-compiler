@@ -13,6 +13,10 @@
 #define EBNF_REGEX_BETWEEN(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 #define EBNF_REGEX_BETWEEN_SAME_CHARS(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 
+//std::string genRegexBetweenStrings(const std::pair<std::string,std::string>& pair, bool inclusive = true) {
+	//return genRegexBetweenStrings(std::string(std::get<0>(pair)),std::string(std::get<1>(pair)),inclusive);
+//}
+
 std::string genRegexBetweenStrings(const std::string& lhs, const std::string& rhs, bool inclusive = true) {
 	std::string wrk_lhs = pcrecpp::RE::QuoteMeta(lhs);
 	std::string wrk_rhs = pcrecpp::RE::QuoteMeta(rhs);
@@ -44,6 +48,14 @@ std::string genRegexBetweenStrings(const std::string& lhs, const std::string& rh
 		regex += ")";
 		return regex;
 	}
+}
+
+std::string genNotBetweenStrings(const std::string& lhs, const std::string& rhs) {
+	std::string regex;
+	
+	
+	
+	return regex;
 }
 
 #ifndef PARSE_TYPE_DEFAULTS
