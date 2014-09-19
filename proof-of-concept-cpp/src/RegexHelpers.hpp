@@ -1,3 +1,5 @@
+#ifndef REGEX_HELPERS_HPP
+#define REGEX_HELPERS_HPP
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -52,9 +54,17 @@ std::string genRegexBetweenStrings(const std::string& lhs, const std::string& rh
 
 std::string genNotBetweenStrings(const std::string& lhs, const std::string& rhs) {
 	std::string regex;
-	
-	
-	
+	std::string wrk_lhs = pcrecpp::RE::QuoteMeta(lhs);
+	std::string wrk_rhs = pcrecpp::RE::QuoteMeta(rhs);
+	if (lhs == rhs) { 
+		if (lhs.size() == 1) {
+			regex = (std::string("([^") + lhs + "](?=(?:[^" + lhs + "]*" + lhs + "[^" + lhs + "]*" + lhs + ")*[^" + lhs +"]*\\Z))+");
+		}
+		
+	}
+	else {
+		//Todo, if it's possible
+	}
 	return regex;
 }
 
@@ -230,14 +240,30 @@ namespace RegexHelper {
 		}
 	}
 	
-	std::string& strip(const pcrecpp::RE& regex, std::string& content) {
-		pcrecpp::StringPiece wrk_content(content);
-		std::string matched_text;
-		if (regex.PartialMatch(content)) {
-			while(regex.FindAndConsume(&wrk_content,&matched_text)) {
-				content.erase(content.find(matched_text),matched_text.size());
-			}
+	std::string strip(const std::string& regex, const std::string& content) {
+		auto matches = getListOfMatches(regex,content);
+		std::string wrk_content(content);
+		for (uint_type iter = matches.size() - 1; iter >= 0 &&  iter < matches.size(); iter--) {
+			wrk_content.erase(matches[iter].second,matches[iter].first.size());
 		}
-		return content;
+		return wrk_content;
 	}
+	
+	std::vector<std::pair<std::string,uint_type > > splitBetweenCharRaw(const std::string& between, const std::string& content) {
+		std::string regex = "([^";
+		regex += pcrecpp::RE::QuoteMeta(between);
+		regex += "]+)";
+		return getListOfMatches(regex,content);
+	}
+	
+	std::vector<std::string> splitBetweenChar(const std::string& between, const std::string& content) {
+		std::vector<std::string> result;
+		auto matches = splitBetweenCharRaw(between,content);
+		for (uint_type iter = 0; iter < matches.size(); iter++) {
+			result.push_back(matches[iter].first);
+		}
+		return result;
+	}
+
 };
+#endif
