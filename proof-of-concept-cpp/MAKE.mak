@@ -7,7 +7,7 @@ GNU_CONFIGURE=yes
 all: clc
 
 test:
-	@echo "no test program at this time"
+	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/testgrnd.cpp -o test $(LD)
 
 clc:
 	@echo "compiling clc..."

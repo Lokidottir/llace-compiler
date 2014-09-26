@@ -95,29 +95,59 @@ namespace EvalEBNF {
 	
 	std::vector<std::string> splitSeperators(const std::string& between, const std::string segment) {
 		auto results = RegexHelper::splitBetweenCharRaw(between,segment);
-		for (uint_type iter = 0; iter < results.size(); iter++) {
+		std::vector<std::string> stiched;
+		if (results.size() == 0) return stiched;
+		stiched.push_back(results[0].first);
+		for (uint_type iter = 1; iter < results.size(); iter++) {
 			/*
 				Stitch together any matches that occured between containers.
 			*/
+			bool collided = false;
 			for (auto& elem : EBNF_S_ALL) {
 				std::string regex = genRegexBetweenStrings(elem.first,elem.second,true);
+				auto between_matches = RegexHelper::getListOfMatches(regex,segment);
+				for (uint_type iter_coll = 0; iter_coll < between.size() && !collided; iter++) {
+					collided = (results[iter].second >= between_matches[iter_coll].second
+								&& results[iter].second + results[iter].first.size() <= between_matches[iter_coll].second + between_matches[iter_coll].first.size());
+				}
+			}
+			if (!collided) {
+				std::cout << "Match: " << results[iter].first << " not stiched." << std::endl;
+				stiched.push_back(results[iter].first);
+			}
+			else {
+				std::cout << "Stiching: " << results[iter].first << " to last match" << std::endl;
+				(*stiched.end()) += results[iter].first;
 			}
 		}
+		return stiched;
 	}
 	
 	int segmentType(const std::string& segment) {
-		std::string wrk_segment = RegexHelper::firstMatch("(\\S[\\s\\S]*[\\S])|\\S",segment);
-		if (RegexHelper::firstMatch(genRegexBetweenStrings("str@<",">", true),wrk_segment) == wrk_segment) {
-			return EBNF_TYPE_TERMINAL;
+		if (segment.empty()) return EBNF_TYPE_NOTYPE;
+		else if (RegexHelper::firstMatch(genRegexBetweenStrings("(",")"),segment) == segment) {
+			return EBNF_TYPE_GROUP;
 		}
-		else if (RegexHelper::firstMatch(genRegexBetweenStrings("?","?"),wrk_segment) == wrk_segment) {
-			return EBNF_TYPE_SPECIAL;
+		else if (RegexHelper::firstMatch(genRegexBetweenStrings("[","]"),segment) == segment) {
+			return EBNF_TYPE_OPTION;
 		}
-		else if (!RegexHelper::firstMatch(",",wrk_segment).empty()) {
+		else if (RegexHelper::firstMatch(genRegexBetweenStrings("{","}"),segment) == segment) {
+			return EBNF_TYPE_REPEAT;
+		}
+		else if (RegexHelper::getListOfMatches("\\,",segment).size() > 0) {
 			return EBNF_TYPE_RULE;
 		}
-		else if (!RegexHelper::firstMatch("|",wrk_segment).empty()) {
+		else if (RegexHelper::getListOfMatches("\\|",segment).size() > 0) {
 			return EBNF_TYPE_ALTERNATION;
+		}
+		else if (segment[0] == '?' && segment[segment.size() - 1] == '?') {
+			return EBNF_TYPE_SPECIAL;
+		}
+		else if (RegexHelper::firstMatch(genRegexBetweenStrings("str@<",">", true),segment) == segment) {
+			return EBNF_TYPE_TERMINAL;
+		}
+		else if (RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment) == segment) {
+			return EBNF_TYPE_IDENTIFIER;
 		}
 		else return EBNF_TYPE_NOTYPE;
 	}
@@ -127,13 +157,13 @@ namespace EvalEBNF {
 								const std::vector<std::string>& string_table,
 								Stack<std::string>& id_stack,
 								Stack<std::string>& depends_stack) {
-		std::string segment = RegexHelper::firstMatch("((\\S+(\\s|\\S)+\\S+)|\\S)",given_segment);
+		std::string segment = RegexHelper::firstMatch("((\\S+(\\s|\\S)*\\S+)|\\S)",given_segment);
 		std::string regex = "(";
 		std::string match;
 		std::string temp;
 		int temp_num = 0;
 		std::vector<std::string> rules;
-		std::cout << "segment type ID " << segmentType(segment) << std::endl;
+		std::cout << "segment type ID for: " << segment << " is " << segmentType(segment) << std::endl;
 		uint_type segment_type = segmentType(segment);
 		if (segment_type == EBNF_TYPE_GROUP) {
 			/*
@@ -203,13 +233,13 @@ namespace EvalEBNF {
 			regex += evaluateSegment(match,ruleset,string_table,id_stack,depends_stack);
 		}
 		else if (segment_type == EBNF_TYPE_RULE) {
-			rules = RegexHelper::splitBetweenChar(",",segment);
+			rules = splitSeperators(",",segment);
 			for (uint_type iter = 0; iter < rules.size(); iter++) {
 				regex += evaluateSegment(rules[iter],ruleset,string_table,id_stack,depends_stack);
 			}
 		}
 		else if (segment_type == EBNF_TYPE_ALTERNATION) {
-			rules = RegexHelper::splitBetweenChar("|",segment);
+			rules = splitSeperators("|",segment);
 			for (uint_type iter = 0; iter < rules.size(); iter++) {
 				regex += evaluateSegment(match,ruleset,string_table,id_stack,depends_stack);
 				if (iter < rules.size() - 1) regex += "|";
@@ -222,6 +252,7 @@ namespace EvalEBNF {
 		}
 		else {
 			EBNF_EVAL_OUT << "rule segment \"" << segment << "\" has no known evaluation type" << std::endl;
+			EBNF_EVAL_OUT << "" << std::endl;
 		}
 		regex += ")";
 		return regex;
