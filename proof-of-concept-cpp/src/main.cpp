@@ -34,11 +34,11 @@ int main(int argc, char** args) {
 	if (ebnf_filename.size() > 0) {
 		EBNFTree tree(ebnf_filename, EBNFTree::flag_file);
 		std::cout << "Loaded EBNF file from source: " << ebnf_filename << std::endl;
-		std::cout << "Grammar loaded:\n" << tree.grammar() << std::endl;
 		std::cout << "Grammar evaluated to:" << std::endl;
 		for (auto& elem : tree.regex_map) {
 			std::cout << "\tRule \"" << elem.first << "\" as:" << std::endl;
 			std::cout << "\t\t" << elem.second.regex << std::endl;
+			std::cout << "\t\t" << elem.second.assemble(tree.regex_map) << std::endl;
 		}
 	}
 	if (runtest) {

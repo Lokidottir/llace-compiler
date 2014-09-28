@@ -35,3 +35,4 @@ clean_pcre:
 
 clean:
 	rm -rf clc
+	rm -rf test

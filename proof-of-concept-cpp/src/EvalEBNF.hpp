@@ -13,6 +13,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "RegexHelpers.hpp"
+#include "EBNFTypeDeduction.hpp"
 
 
 const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
@@ -35,24 +36,6 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 #define EBNF_S_SPECIAL ebnf_cont_str[6]
 #define EBNF_S_ALL ebnf_cont_str
 
-#define EBNF_REGEX_COMMENT EBNF_REGEX_BETWEEN("\\(\\*","\\*\\)")
-#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)(?=(\\s*)(\\=)((.|\\s)*)(;))"
-#define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
-#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)*)\\=[^;]*;)"
-#define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)"
-#define EBNF_REGEX_TERMSTR (genRegexBetweenStrings("\"","\"") + "|" + genRegexBetweenStrings("'","'"))
-
-enum Type {
-	EBNF_TYPE_GROUP,
-	EBNF_TYPE_SPECIAL,
-	EBNF_TYPE_REPEAT,
-	EBNF_TYPE_TERMINAL,
-	EBNF_TYPE_OPTION,
-	EBNF_TYPE_RULE,
-	EBNF_TYPE_IDENTIFIER,
-	EBNF_TYPE_ALTERNATION,
-	EBNF_TYPE_NOTYPE
-};
 
 #define EBNF_EVAL_OUT std::cout << "(EBNF Evaluation) "
 #define EBNF_EVAL_ERROUT std::cerr << "(EBNF Evaluation) Error: "
@@ -66,31 +49,8 @@ namespace EvalEBNF {
 		/*
 			Strips all comments not contained within a string from an entire
 			EBNF grammar.
-			 
-			Not currently working entirely, would evaluate the centre of "(*" (* *) "*)"
-			as not a comment.
 		*/
-		auto comment_matches = RegexHelper::getListOfMatches(EBNF_REGEX_COMMENT, content);
-		auto string_mask = RegexHelper::matchMask(EBNF_REGEX_TERMSTR, content);
-		std::string wrk_content = content;
-		for (uint_type iter = comment_matches.size() - 1; iter >= 0 && iter < comment_matches.size(); iter--) {
-			bool contained_by_string = (string_mask[comment_matches[iter].second]
-									|| string_mask[comment_matches[iter].second + 1]
-									|| string_mask[comment_matches[iter].second + comment_matches[iter].first.size() - 1]
-									|| string_mask[comment_matches[iter].second + comment_matches[iter].first.size() - 2]);
-			/*
-				Remove match from the comment array if any part of the containing strings
-				match as a string. 
-			*/
-			
-			if (!contained_by_string) {
-				/*
-					Comment isn't within string, erase.
-				*/
-				wrk_content.erase(comment_matches[iter].second, comment_matches[iter].first.size());
-			}
-		}
-		return wrk_content;
+		return RegexHelper::strip(genRegexBetweenStrings("(*","*)"),content);
 	}
 	
 	std::vector<std::string> splitSeperators(const std::string& between, const std::string segment) {
@@ -106,50 +66,21 @@ namespace EvalEBNF {
 			for (auto& elem : EBNF_S_ALL) {
 				std::string regex = genRegexBetweenStrings(elem.first,elem.second,true);
 				auto between_matches = RegexHelper::getListOfMatches(regex,segment);
-				for (uint_type iter_coll = 0; iter_coll < between.size() && !collided; iter++) {
+				if (between_matches.size() == 0) continue;
+				for (uint_type iter_coll = 0; iter_coll < between.size() && !collided; iter_coll++) {
 					collided = (results[iter].second >= between_matches[iter_coll].second
-								&& results[iter].second + results[iter].first.size() <= between_matches[iter_coll].second + between_matches[iter_coll].first.size());
+							 && results[iter].second + results[iter].first.size() - 1
+							 <= between_matches[iter_coll].second + between_matches[iter_coll].first.size() - 1);
 				}
 			}
 			if (!collided) {
-				std::cout << "Match: " << results[iter].first << " not stiched." << std::endl;
 				stiched.push_back(results[iter].first);
 			}
 			else {
-				std::cout << "Stiching: " << results[iter].first << " to last match" << std::endl;
 				(*stiched.end()) += results[iter].first;
 			}
 		}
 		return stiched;
-	}
-	
-	int segmentType(const std::string& segment) {
-		if (segment.empty()) return EBNF_TYPE_NOTYPE;
-		else if (RegexHelper::firstMatch(genRegexBetweenStrings("(",")"),segment) == segment) {
-			return EBNF_TYPE_GROUP;
-		}
-		else if (RegexHelper::firstMatch(genRegexBetweenStrings("[","]"),segment) == segment) {
-			return EBNF_TYPE_OPTION;
-		}
-		else if (RegexHelper::firstMatch(genRegexBetweenStrings("{","}"),segment) == segment) {
-			return EBNF_TYPE_REPEAT;
-		}
-		else if (RegexHelper::getListOfMatches("\\,",segment).size() > 0) {
-			return EBNF_TYPE_RULE;
-		}
-		else if (RegexHelper::getListOfMatches("\\|",segment).size() > 0) {
-			return EBNF_TYPE_ALTERNATION;
-		}
-		else if (segment[0] == '?' && segment[segment.size() - 1] == '?') {
-			return EBNF_TYPE_SPECIAL;
-		}
-		else if (RegexHelper::firstMatch(genRegexBetweenStrings("str@<",">", true),segment) == segment) {
-			return EBNF_TYPE_TERMINAL;
-		}
-		else if (RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment) == segment) {
-			return EBNF_TYPE_IDENTIFIER;
-		}
-		else return EBNF_TYPE_NOTYPE;
 	}
 	
 	std::string evaluateSegment(const std::string& given_segment, 
@@ -163,96 +94,103 @@ namespace EvalEBNF {
 		std::string temp;
 		int temp_num = 0;
 		std::vector<std::string> rules;
-		std::cout << "segment type ID for: " << segment << " is " << segmentType(segment) << std::endl;
-		uint_type segment_type = segmentType(segment);
-		if (segment_type == EBNF_TYPE_GROUP) {
-			/*
-				Get the non-inclusive match and pass it down to be further evaluated.
-			*/
-			match = RegexHelper::firstMatch(genRegexBetweenStrings("(",")",false),segment);
-			regex += (std::string("(") + evaluateSegment(match,ruleset,string_table,id_stack,depends_stack) + ")");
-		}
-		else if (segment_type == EBNF_TYPE_SPECIAL) {
-			/*
-				Evaluate special as inline regular expression.
-			*/
-			/*
-				Find the Regex embedded in the special with Perl notation:
-				eg:
-					? /[a-z]+/ ?
-				will evaluate to [a-z]+.
-			*/
-			match = RegexHelper::firstMatch(genRegexBetweenStrings("/","/",true),segment);
-			temp = RegexHelper::firstMatch(pcrecpp::RE::QuoteMeta("(?R)"),match);
-			if (!temp.empty()) {
+		std::cout << "segment type for: " << segment << " is " << typeStr(segment) << std::endl;
+		if (segment.size() == 0) return "";
+		switch(type(segment)) {
+			case types::alternation:
+				rules = splitSeperators("|",segment);
+				for (uint_type iter = 0; iter < rules.size(); iter++) {
+					regex += evaluateSegment(rules[iter],ruleset,string_table,id_stack,depends_stack);
+					if (iter < rules.size() - 1) regex += "|";
+				}
+				break;
+			case types::group:
+				regex += "(";
+				regex += evaluateSegment(segment.substr(1,segment.size() - 2),ruleset,string_table,id_stack,depends_stack);
+				regex += ")";
+				break;
+			case types::option:
+				regex += "(?:";
+				regex += evaluateSegment(segment.substr(1,segment.size() - 2),ruleset,string_table,id_stack,depends_stack);
+				regex += ")?";
+				break;
+			case types::repeat:
+				regex += "(";
+				regex += evaluateSegment(segment.substr(1,segment.size() - 2),ruleset,string_table,id_stack,depends_stack);
+				regex += ")+";
+				break;
+			case types::concatination:
+				rules = splitSeperators(",",segment);
+				for (uint_type iter = 0; iter < rules.size(); iter++) {
+					regex += evaluateSegment(rules[iter],ruleset,string_table,id_stack,depends_stack);
+				}
+				break;
+			case types::terminal:
+				try {
+					temp_num = std::stoi(RegexHelper::strip("([^0-9]+)",segment));
+				}
+				catch (std::invalid_argument& err) {
+					std::cout << "Could not load number from: " << segment << std::endl;
+				}
+				std::cout << "Hit terminal of " << segment << " as: " << temp_num << std::endl;
+				regex += pcrecpp::RE::QuoteMeta(string_table[temp_num]);
+				break;
+			case types::special:
 				/*
-					There is an instance of self-recusion within the inlined regex, this needs
-					to be processed as a named group that recurses itself and amended to the 
-					beginning of the regular expression.
+					Evaluate special as inline regular expression.
 				*/
-				uint_type id_num = 0;
-				std::stringstream generated_id;
-				do {
-					generated_id.str(std::string());
-					generated_id.clear();
-					generated_id << id_stack[0] << "_" << id_num;
-					id_num--;
-				} while(id_stack.contains(generated_id.str()) && id_num != 0);
 				/*
-					A unique ID has been generated and must be pushed to the stack to prevent 
-					a duplicate.
+					Find the Regex embedded in the special with Perl notation:
+					eg:
+						? /[a-z]+/ ?
+					will evaluate to [a-z]+.
 				*/
-				id_stack.push(generated_id.str());
-				/*
-					Replace all instances of "(?R)" with \g'generated_id'
-				*/
-				std::string replace_with = "\\g'" + generated_id.str() + "'";
-				pcrecpp::RE(pcrecpp::RE::QuoteMeta("(?R)")).GlobalReplace(replace_with.c_str(),&match);
-				regex = std::string("((?P<") + generated_id.str() + ">(" + match + ")){0})" + regex;
-			}
-			else {
-				/*
-					Regex contains no instance of "(?R)" self-recursion, and needs no further
-					processing.
-				*/
-				regex += match.substr(1,match.size() - 2);
-			}
-		}
-		else if (segment_type == EBNF_TYPE_TERMINAL) {
-			try {
-				temp_num = std::stoi(RegexHelper::strip("[^0-9]+",segment));
-			}
-			catch (std::invalid_argument& err) {
-				std::cout << "Could not load number from: " << segment << std::endl;
-			}
-			std::cout << "Hit terminal of " << segment << " as: " << temp_num << std::endl;
-			regex += pcrecpp::RE::QuoteMeta(string_table[temp_num]);
-		}
-		else if (segment_type == EBNF_TYPE_OPTION) {
-			match = RegexHelper::firstMatch(genRegexBetweenStrings("[","]",false),segment);
-			regex += evaluateSegment(match,ruleset,string_table,id_stack,depends_stack);
-		}
-		else if (segment_type == EBNF_TYPE_RULE) {
-			rules = splitSeperators(",",segment);
-			for (uint_type iter = 0; iter < rules.size(); iter++) {
-				regex += evaluateSegment(rules[iter],ruleset,string_table,id_stack,depends_stack);
-			}
-		}
-		else if (segment_type == EBNF_TYPE_ALTERNATION) {
-			rules = splitSeperators("|",segment);
-			for (uint_type iter = 0; iter < rules.size(); iter++) {
-				regex += evaluateSegment(match,ruleset,string_table,id_stack,depends_stack);
-				if (iter < rules.size() - 1) regex += "|";
-			}
-		}
-		else if (segment_type == EBNF_TYPE_IDENTIFIER) {
-			temp = RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment);
-			depends_stack.push(temp);
-			regex += ("\\g'" + temp + "'");
-		}
-		else {
-			EBNF_EVAL_OUT << "rule segment \"" << segment << "\" has no known evaluation type" << std::endl;
-			EBNF_EVAL_OUT << "" << std::endl;
+				match = RegexHelper::firstMatch(genRegexBetweenStrings("/","/",true),segment);
+				temp = RegexHelper::firstMatch(pcrecpp::RE::QuoteMeta("(?R)"),match);
+				if (!temp.empty()) {
+					/*
+						There is an instance of self-recusion within the inlined regex, this needs
+						to be processed as a named group that recurses itself and amended to the 
+						beginning of the regular expression.
+					*/
+					uint_type id_num = 0;
+					std::stringstream generated_id;
+					do {
+						generated_id.str(std::string());
+						generated_id.clear();
+						generated_id << id_stack[0] << "_" << id_num;
+						id_num--;
+					} while (id_stack.contains(generated_id.str()) && id_num != 0);
+					/*
+						A unique ID has been generated and must be pushed to the stack to prevent 
+						a duplicate.
+					*/
+					id_stack.push(generated_id.str());
+					/*
+						Replace all instances of "(?R)" with \g'generated_id'
+					*/
+					std::string replace_with = "\\g'" + generated_id.str() + "'";
+					pcrecpp::RE(pcrecpp::RE::QuoteMeta("(?R)")).GlobalReplace(replace_with.c_str(),&match);
+					regex = std::string("((?P<") + generated_id.str() + ">(" + match + ")){0})" + regex;
+				}
+				else {
+					/*
+						Regex contains no instance of "(?R)" self-recursion, and needs no further
+						processing.
+					*/
+					regex += match.substr(1,match.size() - 2);
+				}
+				break;
+			case types::identifier:
+				temp = RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment);
+				if (!depends_stack.contains(temp)) depends_stack.push(temp);
+				regex += ("\\g'" + temp + "'");
+				break;
+			case types::negation:
+				break;
+			default:
+				EBNF_EVAL_ERROUT << "rule segment \"" << segment << "\" has no known evaluation type." << std::endl;
+				break;
 		}
 		regex += ")";
 		return regex;
@@ -284,11 +222,11 @@ namespace EvalEBNF {
 		EvaluatedRule(const std::string rule_id, 
 					  const std::string original, 
 					  const std::string regex, 
-					  const std::vector<std::string> dependencies) : EvaluatedRule() {
+					  const Stack<std::string> dependencies) : EvaluatedRule() {
 			this->rule_id = rule_id;
 			this->original = original;
 			this->regex = regex;
-			this->dependencies = dependencies;
+			this->dependencies = std::vector<std::string>(dependencies);
 		}
 		
 		~EvaluatedRule() {
@@ -304,12 +242,9 @@ namespace EvalEBNF {
 		
 		std::string assemble(const std::map<std::string,EvaluatedRule>& rules) const {
 			Stack<std::string> depends_stack;
-			std::string regex = this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'";
-			std::string dependencies;
-			for (uint_type i = depends_stack.size() - 1; i == depends_stack.size() - 1; i--) {
-				dependencies += depends_stack.pop();
-			}
-			return dependencies + regex;
+			depends_stack.push(this->rule_id);
+			std::string regex = (this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'");
+			return regex;
 		}
 		
 		std::string assembleNocall(const std::map<std::string,EvaluatedRule>& rules, Stack<std::string>& depends_stack) const {
@@ -366,9 +301,7 @@ namespace EvalEBNF {
 		rule.rule_id = rule_id;
 		rule.original = ruleset.at(rule_id);
 		rule.regex = regex;
-		for (uint_type i = 0; i < depends_stack.size(); i++) {
-			rule.dependencies.push_back(depends_stack[i]);
-		}
+		rule.dependencies = depends_stack;
 		return rule;
 	}
 };

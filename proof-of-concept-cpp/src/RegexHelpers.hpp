@@ -12,6 +12,13 @@
 #include <cstdlib>
 
 
+#define EBNF_REGEX_COMMENT EBNF_REGEX_BETWEEN("\\(\\*","\\*\\)")
+#define EBNF_REGEX_ID "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)(?=(\\s*)(\\=)((.|\\s)*)(;))"
+#define EBNF_REGEX_RULE "(?<=\\=)([^;]*)(?=;)"
+#define EBNF_REGEX_IDDECLR "(([a-zA-Z0-9_]([a-zA-Z0-9_]|\\s)*)\\=[^;]*;)"
+#define EBNF_REGEX_ID_LONE "(([a-zA-Z0-9]|_)([a-zA-Z0-9]|_| )*([a-zA-Z0-9])+)"
+#define EBNF_REGEX_TERMSTR (genRegexBetweenStrings("\"","\"") + "|" + genRegexBetweenStrings("'","'"))
+
 #define EBNF_REGEX_BETWEEN(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 #define EBNF_REGEX_BETWEEN_SAME_CHARS(lhs,rhs) genRegexBetweenStrings(lhs,rhs)
 

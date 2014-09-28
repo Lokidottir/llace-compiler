@@ -189,14 +189,24 @@ class Stack {
 			this->logical_size = move.logical_size;
 		}
 		
+		Stack(const std::vector<T>& copyvec) : Stack() {
+			for (uint_type i = 0; i < copyvec.size(); i++) this->push(copyvec[i]);
+		}
+		
 		~Stack() {
 			delete this->stk;
 		}
 		
-		T& operator[] (size_t index) {
+		Stack<T>& operator=(const Stack<T>& copy) {
+			this->stk = new Node(*copy.stk);
+			this->logical_size = copy.logical_size;
+			return *this;
+		}
+		
+		T& operator[] (size_t index) const {
 			size_t wrk_index = 0;
 			Node* ptr = this->stk;
-			while (wrk_index < index && ptr != nullptr) {
+			if (ptr != nullptr) while (wrk_index < index && ptr->node != nullptr) {
 				ptr = ptr->node;
 			}
 			return ptr->data;
@@ -230,7 +240,7 @@ class Stack {
 			this->logical_size++;
 		}
 		
-		bool contains(const T& val) {
+		bool contains(const T& val) const {
 			Node* ptr = this->stk;
 			if (ptr != nullptr) while (ptr->node != nullptr) {
 				if (ptr->data == val) return true;
@@ -239,11 +249,19 @@ class Stack {
 			return false;
 		}
 		
-		size_t size() {
+		operator std::vector<T> () const {
+			std::vector<T> vec(this->size());
+			for (size_t i = 0; i < this->size(); i++) {
+				vec[i] = (*this)[i];
+			}
+			return vec;
+		}
+		
+		size_t size() const {
 			return this->logical_size;
 		}
 		
-		T top() {
+		T top() const {
 			Node* ptr = this->topNode();
 			if (ptr != nullptr) return ptr->data;
 			else return T();
