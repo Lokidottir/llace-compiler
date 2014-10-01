@@ -1,6 +1,6 @@
 circuit-lang
 ============
 
-An attempt to bring a basic abstraction layer to circuitry that resembles a programming langauge.
+An attempt at a high-level Hardware Description Language written in C++
 
 ****
