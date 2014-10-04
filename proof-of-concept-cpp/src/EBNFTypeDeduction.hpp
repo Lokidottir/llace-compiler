@@ -58,35 +58,68 @@ namespace EvalEBNF {
 				return (RegexHelper::firstMatch(genRegexBetweenStrings("{","}",true),segment) == segment);
 			case types::concatination:
 				/*
-					
+					Concatination type. Concatinations are only considered such if they
+					are not immediately contained by containers.
 				*/
 				return (!(isType(segment, types::group))
 					 && !(isType(segment, types::option))
 					 && !(isType(segment, types::repeat))
 					 && !(RegexHelper::firstMatch("(,)",segment).empty()));
 			case types::terminal:
+				/*
+					Terminal type. As strings are stripped from the source before processing
+					and replaced with "str@<index>" where "index" is a positive integer, it
+					is simple to check if a segment is a terminal as the test is similar for
+					testing for container types in that the index is contained by the strings
+					"str@<" and ">".
+				*/
 				return ((RegexHelper::firstMatch(genRegexBetweenStrings("str@<",">",true),segment) == segment));
 			case types::special:
+				/*
+					Special type. Checked for by seeing if it's neither a concatination or an
+					alternation and then seeing if the first and last characters are '?'
+				*/
 				return (segment.size() > 1
 					 && !(isType(segment, types::concatination))
 					 && !(isType(segment, types::alternation))
 					 && RegexHelper::firstMatch("(\\S)",segment) == "?"
 					 && RegexHelper::lastMatch("(\\S)",segment) == "?");
 			case types::identifier:
+				/*
+					Identifier type. Checked for with the same regex used to pull the identifier
+					from the grammar. If it's the same as the whole segment, then it matches an
+					identifier.
+				*/
 				return (RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment) == segment);
 			case types::negation:
+				/*
+					Negation type. If the segment is neither a concatination or an alternation
+					and the first character is a '-' then it is thought of as a negation. Not
+					evaluated, but a type is declared.
+				*/
 				return (!(isType(segment, types::concatination))
 					 && !(isType(segment, types::alternation))
 					 && (RegexHelper::firstMatch("(\\S)",segment) == "-"));
 			default:
+				/*
+					Unnknown type check, always return false.
+				*/
 				return false;
 		}
 	}
 	
 	uint_type type(const std::string& segment) {
+		/*
+			Checks a segment against every declared type and returns
+			the constant that represents it.
+		*/
 		for (uint_type iter = 0; iter < types::typelist.size(); iter++) {
 			if (isType(segment, types::typelist[iter])) return types::typelist[iter];
 		}
+		/*
+			If the segment is of no type, then a code that matches no
+			type is returned.
+		*/
 		return (*types::typelist.end()) + 1;
 	}
 	

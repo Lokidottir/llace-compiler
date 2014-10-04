@@ -31,8 +31,8 @@ get_pcre: setup_pcre
 	mv pcre-8.35 pcre
 
 clean_pcre:
-	rm -rf pcre*
+	-rm -rf pcre*
 
 clean:
-	rm -rf clc
-	rm -rf test
+	-rm -rf clc
+	-rm -rf test

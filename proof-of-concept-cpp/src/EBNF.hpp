@@ -1,3 +1,5 @@
+#ifndef EBNF_MAIN_HPP
+#define EBNF_MAIN_HPP
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -19,65 +21,6 @@
 typedef uintmax_t uint_type;
 typedef double prec_type;
 #endif
-
-class EBNFElement {
-	private:
-		std::string identifier_;
-		std::string content_;
-		uint_type line_;
-		uint_type col_;
-	public:
-		
-		EBNFElement() : identifier_(), content_(), line_(0), col_(0) {	
-		}
-		
-		EBNFElement(const EBNFElement& copy) :  EBNFElement() {
-			this->identifier_ = copy.identifier_;
-			this->content_ = copy.content_;
-			this->line_ = copy.line_;
-			this->col_ = copy.col_;
-		}
-		
-		EBNFElement(EBNFElement&& move) {
-			std::swap(this->identifier_, move.identifier_);
-			std::swap(this->content_, move.content_);
-			std::swap(this->line_, move.line_);
-			std::swap(this->col_, move.col_);
-		}
-		
-		~EBNFElement() {	
-		}
-		
-		EBNFElement(const std::string& identifier_, const std::string& content_, const uint_type line_, const uint_type col_) {
-			this->identifier_ = identifier_;
-			this->content_ = content_;
-			this->line_ = line_;
-			this->col_ = col_;
-		}
-		
-		EBNFElement(const std::string& identifier_, const std::string& content_, const std::pair<uint_type,uint_type>& position) : EBNFElement(identifier_, content_, std::get<0>(position), std::get<1>(position)) {
-		}
-		
-		uint_type line() {
-			return this->line_;
-		}
-		
-		uint_type col() {
-			return this->col_;
-		}
-		
-		uint_type size() {
-			return this->content_.size();
-		}
-		
-		std::string content() {
-			return this->content_;
-		}
-		
-		std::string identifier() {
-			return this->identifier_;
-		}
-};
 
 std::string loadIntoString(const std::string& filename) {
 	std::fstream file_stream(filename.c_str(), std::ios::in);
@@ -102,7 +45,7 @@ std::string loadIntoString(const std::string& filename) {
 #define EBNF_ERROUT std::cerr << "(EBNF interpreter) Error: "
 #define EBNF_OUT std::cout << "(EBNF interpreter) "
 
-class EBNFTree {
+class EBNF {
 	private:
 		
 		std::string loaded_grammar;
@@ -171,17 +114,17 @@ class EBNFTree {
 		std::map<std::string,EvalEBNF::EvaluatedRule> regex_map;
 		std::vector<std::string> string_table;
 		
-		EBNFTree() : id_rule_map(), regex_map() {
+		EBNF() : id_rule_map(), regex_map() {
 		}
 		
-		EBNFTree(const EBNFTree& copy) : EBNFTree() {
+		EBNF(const EBNF& copy) : EBNF() {
 			this->id_rule_map = copy.id_rule_map;
 			this->regex_map = copy.regex_map;
 			this->loaded_grammar = copy.loaded_grammar;
 			this->string_table = copy.string_table;
 		}
 		
-		EBNFTree(EBNFTree&& move) : EBNFTree() {
+		EBNF(EBNF&& move) : EBNF() {
 			std::swap(this->id_rule_map, move.id_rule_map);
 			std::swap(this->regex_map, move.regex_map);
 			std::swap(this->loaded_grammar, move.loaded_grammar);
@@ -191,7 +134,7 @@ class EBNFTree {
 		const static uint_type flag_file = 0b0;
 		const static uint_type flag_string = 0b1;
 		
-		EBNFTree(const std::string& content, uint_type stringtype_flag = flag_string) : EBNFTree() {
+		EBNF(const std::string& content, uint_type stringtype_flag = flag_string) : EBNF() {
 			if ((stringtype_flag & flag_string) != 0) {
 				/*
 					The string provided is a grammar in string form
@@ -221,7 +164,7 @@ class EBNFTree {
 			//Find identifiers
 			this->fetchRules(content);
 			this->evaluateRules();
-			return false;
+			return true;
 		}
 		
 		void reload() {
@@ -235,7 +178,7 @@ class EBNFTree {
 			Append functions, for increasing the size of the grammar.
 		*/
 		
-		void append(const EBNFTree& tree) {
+		void append(const EBNF& tree) {
 			this->loaded_grammar += tree.loaded_grammar;
 			this->reload();
 		}
@@ -245,24 +188,24 @@ class EBNFTree {
 			this->reload();
 		}
 		
-		EBNFTree& operator+= (const EBNFTree& tree) {
+		EBNF& operator+= (const EBNF& tree) {
 			this->append(tree);
 			return *this;
 		}
 		
-		EBNFTree& operator+= (const std::string& grammar) {
+		EBNF& operator+= (const std::string& grammar) {
 			this->append(grammar);
 			return *this;
 		}
 		
-		EBNFTree operator+ (const EBNFTree& tree) const {
-			EBNFTree tree_new(*this);
+		EBNF operator+ (const EBNF& tree) const {
+			EBNF tree_new(*this);
 			tree_new += tree;
 			return tree_new;
 		}
 		
-		EBNFTree operator+ (const std::string& grammar) const {
-			EBNFTree tree_new(*this);
+		EBNF operator+ (const std::string& grammar) const {
+			EBNF tree_new(*this);
 			tree_new += grammar;
 			return tree_new;
 		}
@@ -306,3 +249,4 @@ class EBNFTree {
 			RegexHelper::briefOnMatches(EBNF_REGEX_BETWEEN("\"","\""),str1);
 		}
 };
+#endif

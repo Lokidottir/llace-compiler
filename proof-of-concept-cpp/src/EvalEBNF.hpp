@@ -94,7 +94,7 @@ namespace EvalEBNF {
 		std::string temp;
 		int temp_num = 0;
 		std::vector<std::string> rules;
-		std::cout << "segment type for: " << segment << " is " << typeStr(segment) << std::endl;
+		EBNF_EVAL_OUT << "segment type for: " << segment << " is " << typeStr(segment) << std::endl;
 		if (segment.size() == 0) return "";
 		switch(type(segment)) {
 			case types::alternation:
@@ -130,9 +130,8 @@ namespace EvalEBNF {
 					temp_num = std::stoi(RegexHelper::strip("([^0-9]+)",segment));
 				}
 				catch (std::invalid_argument& err) {
-					std::cout << "Could not load number from: " << segment << std::endl;
+					EBNF_EVAL_ERROUT << "Could not load number from: " << segment << std::endl;
 				}
-				std::cout << "Hit terminal of " << segment << " as: " << temp_num << std::endl;
 				regex += pcrecpp::RE::QuoteMeta(string_table[temp_num]);
 				break;
 			case types::special:

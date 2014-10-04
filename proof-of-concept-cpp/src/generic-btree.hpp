@@ -1,3 +1,5 @@
+#ifndef GENERIC_TOPOLOGY_HPP
+#define GENERIC_TOPOLOGY_HPP
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -267,3 +269,4 @@ class Stack {
 			else return T();
 		}
 };
+#endif
