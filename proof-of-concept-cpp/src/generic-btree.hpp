@@ -123,6 +123,12 @@ class Trie {
 		bool isterminal() {
 			return this->data.size() == 0;
 		}
+		
+		Trie<T>& operator= (const Trie<T>& copy) {
+			this->self = copy.self;
+			this->data = copy.data;
+			return *this;
+		}
 };
 
 template<class T>

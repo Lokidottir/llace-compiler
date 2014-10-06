@@ -33,15 +33,19 @@ int main(int argc, char** args) {
 		}
 	}
 	if (ebnf_filename.size() > 0) {
-		EBNF tree(ebnf_filename, EBNF::flag_file);
+		EBNF ebnf(ebnf_filename, EBNF::flag_file);
 		std::cout << "Loaded EBNF file from source: " << ebnf_filename << std::endl;
 		std::cout << "Grammar evaluated to:" << std::endl;
-		for (auto& elem : tree.regex_map) {
+		for (auto& elem : ebnf.regex_map) {
 			std::cout << "\tRule \"" << elem.first << "\" as:" << std::endl;
 			std::cout << "\t\t" << elem.second.regex << std::endl;
 			std::cout << "\tWith dependencies:" << std::endl;
-			std::cout << "\t\t" << elem.second.assemble(tree.regex_map) << std::endl;
+			std::cout << "\t\t" << elem.second.assemble(ebnf.regex_map) << std::endl;
 		}
+		std::cout << "Parsing file with generated Regexes..." << std::endl;
+		auto trie = syntree::buildTree(ebnf,loadIntoString("source_file_example.txt"));
+		std::cout << "Parsing complete. Size of tree is: " << trie.size() << std::endl;
+		syntree::treeSummary(trie);
 	}
 	if (runtest) {
 		EBNF::testProgram();

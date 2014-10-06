@@ -242,7 +242,7 @@ namespace EvalEBNF {
 		std::string assemble(const std::map<std::string,EvaluatedRule>& rules) const {
 			Stack<std::string> depends_stack;
 			depends_stack.push(this->rule_id);
-			std::string regex = (this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "'");
+			std::string regex = ("(" + this->assembleNocall(rules,depends_stack) + "\\g'" + this->rule_id + "')");
 			return regex;
 		}
 		

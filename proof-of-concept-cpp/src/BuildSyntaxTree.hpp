@@ -101,15 +101,26 @@ namespace syntree {
 	}
 	
 	Trie<SyntaxElement> recurseParse(const EBNF& grammar, const SyntaxElement& previous) {
-		Trie<SyntaxElement> tree;
-		
+		Trie<SyntaxElement> tree(previous);
+		auto large_matches = largestMatches(grammar,previous.content,previous);
+		for (uint_type iter = 0; iter < large_matches.size(); iter++) {
+			tree.data.push_back(recurseParse(grammar,large_matches[iter]));
+		}
 		return tree;
 	}
 	
 	Trie<SyntaxElement> buildTree(const EBNF& grammar, const std::string& source) {
-		Trie<SyntaxElement> tree;
-		
-		return tree;
+		return recurseParse(grammar,SyntaxElement(0,"__syntax_tree_whole__",source));
+	}
+	
+	void treeSummary(const Trie<SyntaxElement>& tree, uint_type depth = 0) {
+		std::string ws_str;
+		for (uint_type i = 0; i < depth; i++) ws_str += " ";
+		std::cout << ws_str << "depth@" << depth << " type@" << tree.self.identifier << " content:" << std::endl;
+		std::cout << ws_str << tree.self.content << std::endl;
+		for (uint_type iter = 0; iter < tree.data.size(); iter++) {
+			treeSummary(tree.data[iter],depth + 1);
+		}
 	}
 	
 };
