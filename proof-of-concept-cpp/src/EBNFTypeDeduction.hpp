@@ -136,7 +136,7 @@ namespace EvalEBNF {
 		if (isType(segment,types::special)) 	  return "special";
 		if (isType(segment,types::identifier))    return "identifier";
 		if (isType(segment,types::negation))	  return "negation";
-		else									  return "notype";
+		else /*There is no type for the segment*/ return "notype";
 	}
 };
 #endif

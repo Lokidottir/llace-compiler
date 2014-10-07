@@ -11,6 +11,9 @@
 #include "generic-btree.hpp"
 #include "EBNF.hpp"
 
+#define PARSE_OUT std::cout << "(Parsing) "
+#define PARSE_ERROUT std::cerr << "(Parsing) Error: "
+
 namespace syntree {
 	
 	struct SyntaxElement {
@@ -63,6 +66,7 @@ namespace syntree {
 			Function that returns a vector of the largest, first occuring matches
 			for further processing.
 		*/
+		
 		std::vector<SyntaxElement> matches;
 		std::vector<std::pair<std::string,std::vector<std::pair<std::string,uint_type> > > > all_matches;
 		uint_type index = 0;
@@ -70,6 +74,7 @@ namespace syntree {
 			Find all matches for all regular expressions.
 		*/
 		for (auto& elem : grammar.regex_map) {
+			PARSE_OUT << "Finding matches for: " << elem.second.rule_id << std::endl;
 			auto regex_matches = RegexHelper::getListOfMatches(elem.second.assemble(grammar.regex_map),content);
 			all_matches.push_back(std::pair<std::string,std::vector<std::pair<std::string,uint_type> > >(elem.second.rule_id,regex_matches));
 		}
@@ -94,7 +99,7 @@ namespace syntree {
 			}
 			if (are_matches) {
 				index = largest.first.size() + largest.second;
-				matches.push_back(SyntaxElement(largest.second, type_string, largest.first));
+				matches.push_back(SyntaxElement(largest.second + previous.index, type_string, largest.first));
 			}
 		}
 		return matches;
@@ -115,9 +120,9 @@ namespace syntree {
 	
 	void treeSummary(const Trie<SyntaxElement>& tree, uint_type depth = 0) {
 		std::string ws_str;
-		for (uint_type i = 0; i < depth; i++) ws_str += " ";
-		std::cout << ws_str << "depth@" << depth << " type@" << tree.self.identifier << " content:" << std::endl;
-		std::cout << ws_str << tree.self.content << std::endl;
+		for (uint_type i = 0; i < depth; i++) ws_str += "\t";
+		std::cout << ws_str << "depth:" << depth << " type:" << tree.self.identifier << " index:" << tree.self.index <<  " content:" << std::endl;
+		std::cout << ws_str << "\"" << tree.self.content << "\"" << std::endl;
 		for (uint_type iter = 0; iter < tree.data.size(); iter++) {
 			treeSummary(tree.data[iter],depth + 1);
 		}

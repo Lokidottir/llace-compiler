@@ -39,6 +39,7 @@ const std::vector<std::pair<std::string, std::string> >ebnf_cont_str = {
 
 #define EBNF_EVAL_OUT std::cout << "(EBNF Evaluation) "
 #define EBNF_EVAL_ERROUT std::cerr << "(EBNF Evaluation) Error: "
+#define EBNF_EVAL_WARNOUT std::cout << "(EBNF Evaluation) Warning: "
 
 namespace EvalEBNF {
 	
@@ -183,12 +184,14 @@ namespace EvalEBNF {
 			case types::identifier:
 				temp = RegexHelper::firstMatch(EBNF_REGEX_ID_LONE,segment);
 				if (!depends_stack.contains(temp)) depends_stack.push(temp);
+				else EBNF_EVAL_WARNOUT << "Circular dependancy on type \"" << temp << "\"" << std::endl;
 				regex += ("\\g'" + temp + "'");
 				break;
 			case types::negation:
 				break;
 			default:
 				EBNF_EVAL_ERROUT << "rule segment \"" << segment << "\" has no known evaluation type." << std::endl;
+				exit(-1);
 				break;
 		}
 		regex += ")";
@@ -268,19 +271,13 @@ namespace EvalEBNF {
 	
 	EvaluatedRule evaluate(const std::string& rule_id, const Ruleset& ruleset, const std::vector<std::string>& string_table) {
 		/*
-			Evaluates a rule with no other rule dependencies.
 			Note: declaring a named expression as ((?P<name>(group)){0}) essentially works
 			as a function declaration, able to be called later with \g'name' ect.
 		*/
+		/*
+			Declare regex header.
+		*/
 		std::string regex = "((?P<" + rule_id + ">(";
-		std::vector<std::string> segments;
-		try {
-			segments = RegexHelper::splitBetweenChar(",",ruleset.at(rule_id));
-		}
-		catch (const std::out_of_range& oor) {
-			EBNF_EVAL_ERROUT << "fetching ID " << rule_id << " from ruleset threw out of range error: " << oor.what() << std::endl;
-			return EvaluatedRule();
-		}
 		/*
 			The ID stack just acts as a container for what IDs are currently declared. A stack
 			seems like an illogical choice but it's the easiest declared type with a contained.
@@ -291,8 +288,13 @@ namespace EvalEBNF {
 			Push the given ID on to the stack.
 		*/
 		id_stack.push(rule_id);
-		for (uint_type iter = 0; iter < segments.size(); iter++) regex += evaluateSegment(segments[iter],ruleset,string_table,id_stack,depends_stack); 
-		regex += ")){0})";
+		try {
+			regex += evaluateSegment(ruleset.at(rule_id),ruleset,string_table,id_stack,depends_stack) + ")){0})";
+		}
+		catch (const std::out_of_range& oor) {
+			EBNF_EVAL_ERROUT << "fetching ID " << rule_id << " from ruleset threw out of range error: " << oor.what() << std::endl;
+			return EvaluatedRule();
+		}
 		EvaluatedRule rule;
 		/*
 			Manually copy data to the rule.

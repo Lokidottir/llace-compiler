@@ -1,10 +1,18 @@
-(* this is a comment *)
-(* this file is to test the EBNF interpreter, nothing else *)
-program = { statement };
-statement = { string | whitespace } , ";";
-string = { letter | integer };
-letter = "A" | "F" | "Q";
-integer = non_0_digit, [ { any_digit } ];
-any_digit = "0" | non_0_digit;
-non_0_digit = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+(* 
+	This is an example EBNF file for basic arithmitic
+*)
+(*
+	Lacking the patience for writing down 62 characters manually, the
+	characters are defined in specials as regular expressions.
+*)
+letter = ? /[a-zA-Z]/ ?;
+non_zero_digit = ? /[1-9]/ ?;
+any_digit = "0" | non_zero_digit;
+variable = { letter };
+integer = non_zero_digit, [ { any_digit } ];
+float = { any_digit }, ".", { any_digit };
+numeric = variable | float | integer;
 whitespace = ? /\s/ ?;
+operator = "+" | "-" | "*" | "/" | "%" | "=";
+operation = numeric, [ { whitespace } ], { operator }, [ { whitespace } ], numeric;
+statement = { operation, [ { whitespace } ] , ";", [ { whitespace } ] };
