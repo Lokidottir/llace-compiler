@@ -1,2 +1,3 @@
-Yarr=4000;
-Var+Varr;
+echo hello world
+hello echo world
+world echo hello

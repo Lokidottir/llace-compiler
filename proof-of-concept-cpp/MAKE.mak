@@ -10,8 +10,8 @@ test:
 	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/testgrnd.cpp -o test $(LD)
 
 clc:
-	@echo "compiling clc..."
-	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/main.cpp -o clc $(LD)
+	@echo "compiling LLace..."
+	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/main.cpp -o llace $(LD)
 
 get_and_make_pcre: clean_pcre get_pcre make_pcre
 
@@ -34,5 +34,5 @@ clean_pcre:
 	-rm -rf pcre*
 
 clean:
-	-rm -rf clc
+	-rm -rf llace
 	-rm -rf test

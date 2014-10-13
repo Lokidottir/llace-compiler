@@ -1,18 +1,13 @@
 (* 
-	This is an example EBNF file for basic arithmitic
+	This is an example EBNF file for testing reasons
 *)
 (*
 	Lacking the patience for writing down 62 characters manually, the
 	characters are defined in specials as regular expressions.
 *)
-letter = ? /[a-zA-Z]/ ?;
-non_zero_digit = ? /[1-9]/ ?;
-any_digit = "0" | non_zero_digit;
-variable = { letter };
-integer = non_zero_digit, [ { any_digit } ];
-float = { any_digit }, ".", { any_digit };
-numeric = variable | float | integer;
-whitespace = ? /\s/ ?;
-operator = "+" | "-" | "*" | "/" | "%" | "=";
-operation = numeric, [ { whitespace } ], { operator }, [ { whitespace } ], numeric;
-statement = { operation, [ { whitespace } ] , ";", [ { whitespace } ] };
+whitespace = ? /\s+/ ?;
+newline = ? /\n/ ?;
+word = { ? /[a-zA-Z0-9_]/ ? };
+args = ["-"], word;
+command = word, [ { whitespace , args } ], newline ;
+file = { command };

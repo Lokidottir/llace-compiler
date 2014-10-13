@@ -17,13 +17,17 @@ std::string stripSubstr(const std::string& content, const std::string& toStrip) 
 }
 
 int main(int argc, char** args) {
-	std::cout << "Circuit language compiler." << std::endl;
+	std::cout << "LLace compiler." << std::endl;
 	std::cout << "using pcre version: " << pcre_version() << std::endl;
 	std::cout << "compiled at " << __TIME__ << " on " << __DATE__ << std::endl; 
 	std::string ebnf_filename;
+	std::string source_filename = "source_file_example.txt";
 	for (int i = 0; i < argc - 1; i++) {
 		if (strcmp(args[i], "-ebnf") == 0) {
 			ebnf_filename = args[i + 1];
+		}
+		if (strcmp(args[i],"-src") == 0) {
+			source_filename = args[i + 1];
 		}
 	}
 	bool runtest = false;
@@ -39,11 +43,11 @@ int main(int argc, char** args) {
 		for (auto& elem : ebnf.regex_map) {
 			std::cout << "\tRule \"" << elem.first << "\" as:" << std::endl;
 			std::cout << "\t\t" << elem.second.regex << std::endl;
-			std::cout << "\tWith dependencies:" << std::endl;
-			std::cout << "\t\t" << elem.second.assemble(ebnf.regex_map) << std::endl;
+			//std::cout << "\tWith dependencies:" << std::endl;
+			//std::cout << "\t\t" << elem.second.assemble(ebnf.regex_map) << std::endl;
 		}
 		std::cout << "Parsing file with generated Regexes..." << std::endl;
-		auto trie = syntree::buildTree(ebnf,loadIntoString("source_file_example.txt"));
+		auto trie = syntree::buildTree(ebnf,loadIntoString(source_filename));
 		std::cout << "Parsing complete. Size of tree is: " << trie.size() << std::endl;
 		syntree::treeSummary(trie);
 	}

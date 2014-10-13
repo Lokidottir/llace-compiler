@@ -81,26 +81,29 @@ namespace syntree {
 		/*
 			Find the  largest match by checking all matches.
 		*/
-		bool are_matches = true;
-		while(index < content.size() && are_matches) {
-			std::pair<std::string,uint_type> largest("",0);
-			std::string type_string;
-			are_matches = false;
-			for (uint_type iter_all = 0; iter_all < all_matches.size(); iter_all++) {
-				for (uint_type iter = 0; iter < all_matches[iter_all].second.size(); iter++) {
-					if (all_matches[iter_all].second[iter].second == index 
-					 && all_matches[iter_all].second[iter].first.size() > largest.first.size()
-					 && all_matches[iter_all].second[iter].first != content) {
-						 type_string = all_matches[iter_all].first;
-						 largest = all_matches[iter_all].second[iter];
-						 are_matches |= true;
+		while (index < content.size()) {
+			bool are_matches = true;
+			while(index < content.size() && are_matches) {
+				std::pair<std::string,uint_type> largest("",0);
+				std::string type_string;
+				are_matches = false;
+				for (uint_type iter_all = 0; iter_all < all_matches.size(); iter_all++) {
+					for (uint_type iter = 0; iter < all_matches[iter_all].second.size(); iter++) {
+						if (all_matches[iter_all].second[iter].second == index 
+						 && all_matches[iter_all].second[iter].first.size() > largest.first.size()
+						 && all_matches[iter_all].second[iter].first != content) {
+							 type_string = all_matches[iter_all].first;
+							 largest = all_matches[iter_all].second[iter];
+							 are_matches |= true;
+						}
 					}
 				}
+				if (are_matches) {
+					index = largest.first.size() + largest.second;
+					matches.push_back(SyntaxElement(largest.second + previous.index, type_string, largest.first));
+				}
 			}
-			if (are_matches) {
-				index = largest.first.size() + largest.second;
-				matches.push_back(SyntaxElement(largest.second + previous.index, type_string, largest.first));
-			}
+			index++;
 		}
 		return matches;
 	}
