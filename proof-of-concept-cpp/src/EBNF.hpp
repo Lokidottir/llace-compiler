@@ -40,8 +40,6 @@ std::string loadIntoString(const std::string& filename) {
 	}
 }
 
-
-
 #define EBNF_ERROUT std::cerr << "(EBNF interpreter) Error: "
 #define EBNF_OUT std::cout << "(EBNF interpreter) "
 

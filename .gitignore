@@ -1,2 +1,7 @@
 *out.txt
 proof-of-concept-cpp/pcre*
+reports/*.log
+reports/*.gz
+
+reports/*.aux
+

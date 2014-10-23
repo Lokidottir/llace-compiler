@@ -59,7 +59,7 @@ namespace EvalEBNF {
 		std::vector<std::string> stiched;
 		if (results.size() == 0) return stiched;
 		stiched.push_back(results[0].first);
-		for (uint_type iter = 1; iter < results.size(); iter++) {
+		if (results.size() > 1) for (uint_type iter = 1; iter < results.size(); iter++) {
 			/*
 				Stitch together any matches that occured between containers.
 			*/
@@ -78,7 +78,8 @@ namespace EvalEBNF {
 				stiched.push_back(results[iter].first);
 			}
 			else {
-				(*stiched.end()) += results[iter].first;
+				EBNF_EVAL_OUT << "End is currently: " << stiched[stiched.size() - 1] << ", stiching: " << results[iter].first << std::endl;
+				stiched[stiched.size() - 1] += results[iter].first;
 			}
 		}
 		return stiched;

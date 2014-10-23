@@ -5,6 +5,7 @@
 #include <cstring>
 #include <vector>
 #include <pcrecpp.h>
+#define EBNF_GIVE_UP_EASILY
 #include "EBNF.hpp"
 #include "BuildSyntaxTree.hpp"
 

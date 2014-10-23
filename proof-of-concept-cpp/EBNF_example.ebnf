@@ -3,11 +3,11 @@
 *)
 (*
 	Lacking the patience for writing down 62 characters manually, the
-	characters are defined in specials as regular expressions.
+	characters can be defined in specials as regular expressions.
 *)
-whitespace = ? /\s+/ ?;
-newline = ? /\n/ ?;
-word = { ? /[a-zA-Z0-9_]/ ? };
-args = ["-"], word;
-command = word, [ { whitespace , args } ], newline ;
-file = { command };
+
+letters = ?/[a-zA-Z]/?;
+word = {letters};
+whitespace = ?/(\s)/?;
+sentance = { word, [whitespace] };
+with_punct = sentance, ".",;

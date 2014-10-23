@@ -23,7 +23,7 @@ namespace syntree {
 		
 		SyntaxElement() : index(0), identifier(), content() {
 		}
-		
+
 		SyntaxElement(const SyntaxElement& copy) : SyntaxElement() {
 			this->index = copy.index;
 			this->identifier = copy.identifier;
@@ -81,7 +81,9 @@ namespace syntree {
 		/*
 			Find the  largest match by checking all matches.
 		*/
+		#ifndef EBNF_GIVE_UP_EASILY
 		while (index < content.size()) {
+		#endif
 			bool are_matches = true;
 			while(index < content.size() && are_matches) {
 				std::pair<std::string,uint_type> largest("",0);
@@ -103,8 +105,10 @@ namespace syntree {
 					matches.push_back(SyntaxElement(largest.second + previous.index, type_string, largest.first));
 				}
 			}
+		#ifndef EBNF_GIVE_UP_EASILY
 			index++;
 		}
+		#endif
 		return matches;
 	}
 	
