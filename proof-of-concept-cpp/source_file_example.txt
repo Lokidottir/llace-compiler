@@ -1,5 +1,15 @@
-this should be a sentance.
+import "libraryexample";
 
-this could be another.
 
-once again this could match.
+/* v- return type describes the output, in main(In power) this is required to return <ground>*/
+/*    no type is declared for ground as the return is just a list of named Out variables.*/
+<ground> main(In power) {
+    /*^- input describing power source*/
+
+
+}
+
+
+<sum, carry> halfAdd(In power, In ) {
+
+}

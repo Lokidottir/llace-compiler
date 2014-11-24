@@ -1,0 +1,47 @@
+(*
+    LLace EBNF Grammar
+    Fionan Haralddottir
+    2014
+    some rules may be split even if not needed due to the EBNF compiler's
+    current issues.
+*)
+
+(*
+    Basic helper rules
+*)
+
+uc_letter = ?/[A-Z]/?;
+
+lc_letter = ?/[a-z]/?;
+
+letter =
+
+nonzero_digit = ?/[1-9]/?;
+
+any_digit = "0" | nonzero_digit;
+
+wspace = ?/\s/?;
+
+parenthesis = "(" ;
+
+(* name of a function block, component variable, component ect. *)
+
+name = letter,[ {letter | "_" | ""} ];
+
+(*
+    Function Blocks
+*)
+
+code_body = "{", { (?/[^\{\}]/?) }, "}";
+
+(* Recursive code body equivilent *)
+
+rec_code_body "{",[ { (?/[^\{\}]/? | rec_code_body ) } ], "}";
+
+component_declr = "component" | "class" | "struct", rec_code_body;
+
+anon_type = "<", ( name | { name, [ { wspace } ], ",", [ { wspace } ] } ), ">";
+
+function_call = name, "(", [ { ?/[^\(\)]/? | function_call } ], ")";
+
+function_declr = anon_type , name, ;

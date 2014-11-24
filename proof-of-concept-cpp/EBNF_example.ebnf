@@ -7,7 +7,8 @@
 *)
 
 letters = ?/[a-zA-Z]/?;
-word = {letters};
-whitespace = ?/(\s)/?;
-sentance = { word, [whitespace] };
-with_punct = sentance, ".",;
+word = { letters };
+whitespaces = ?/\s/?;
+sentance = { word, [ whitespaces ] };
+with_punct = sentance, ".";
+

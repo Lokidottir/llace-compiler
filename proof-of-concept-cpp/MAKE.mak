@@ -4,14 +4,14 @@ CC_FLAGS=-static-libgcc -static-libstdc++ -Wall -std=c++11 -g
 LD=-Ipcre -Lpcre -lpcre -lpcrecpp
 GNU_CONFIGURE=yes
 
-all: clc
+all: llace-ebnf
 
 test:
 	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/testgrnd.cpp -o test $(LD)
 
-clc:
-	@echo "compiling LLace..."
-	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/main.cpp -o llace $(LD)
+llace-ebnf:
+	@echo "compiling LLace EBNF evaluator..."
+	$(DEFAULT_CC) $(CC_FLAGS) -O3 src/main.cpp -o llace-ebnf $(LD)
 
 get_and_make_pcre: clean_pcre get_pcre make_pcre
 
@@ -23,7 +23,7 @@ make_pcre: setup_pcre
 
 setup_pcre:
 	mkdir -p pcre
-	
+
 get_pcre: setup_pcre
 	wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.35.tar.gz
 	tar -zxvf pcre-8.35.tar.gz
